@@ -1,0 +1,29 @@
+{
+  "name": "@pipehitter/medcore",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Med planning core — PACE plans, facility ranking, echelons of care, MedSlide component",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "geographiclib-geodesic": "^2.2.0",
+    "mgrs": "^2.1.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/react": "^16.3.2",
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^24.12.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "jsdom": "^29.1.1",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.9"
+  }
+}
