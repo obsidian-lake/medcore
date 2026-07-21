@@ -52,6 +52,13 @@ export type { ComposeOptions, Arrow } from './export/composeMapCanvas'
 export { composeMapCanvas } from './export/composeMapCanvas'
 export { renderMedMapToCanvas } from './export/mapSnapshot'
 
+// ── Country code detection ────────────────────────────────────────────────────
+export { detectCountryCode } from './util/countryCode'
+
+// ── Full pipeline ─────────────────────────────────────────────────────────────
+export type { ComputeMedPlanInput, MedPlanResult } from './computeMedPlan'
+export { computeMedPlan } from './computeMedPlan'
+
 // ── MedSlide component ────────────────────────────────────────────────────────
 export type { MedSlideInput } from './slide/MedSlide'
 export { MedSlide } from './slide/MedSlide'
