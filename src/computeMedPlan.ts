@@ -63,6 +63,12 @@ export interface MedPlanResult {
   countryCode: string
   targetLat: number
   targetLon: number
+  /**
+   * Final ranked facility list (post Level-I expansion) used by consumers to
+   * rebuild PACE plans offline without a network round-trip (e.g. the MFFJM
+   * refine panel in the Products tab).
+   */
+  ranked: FacilityScore[]
 }
 
 // ── Main function ──────────────────────────────────────────────────────────────
@@ -346,5 +352,6 @@ export async function computeMedPlan(
     countryCode,
     targetLat: target.lat,
     targetLon: target.lon,
+    ranked: rankResult.ranked,
   }
 }
