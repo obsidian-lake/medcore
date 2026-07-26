@@ -431,9 +431,8 @@ export async function renderMedMapToCanvas(
   const log = (msg: string) => onProgress?.(msg)
 
   const L = await import('leaflet')
-  // CSS is loaded by the consuming app's bundler (Vite handles it at the app level)
-  // Dynamically import to avoid breaking standalone tsc — Vite will resolve it.
-  await import('leaflet/dist/leaflet.css').catch(() => { /* ok if not bundled */ })
+  // vite-ignore: CSS is provided by the consuming app's bundler; medcore never bundles it.
+  await import(/* @vite-ignore */ 'leaflet/dist/leaflet.css').catch(() => { /* ok if not bundled */ })
 
   const container = makeOffscreenDiv(SNAP_W, SNAP_H)
 
