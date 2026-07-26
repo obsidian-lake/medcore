@@ -33,7 +33,7 @@ export type { FacilityScore, RankResult } from './med/rank'
 export { rankFacilities, formatTransit } from './med/rank'
 
 // ── PACE plans ────────────────────────────────────────────────────────────────
-export type { FacilityPace, FacilityPaceEntry, TreatmentPace } from './med/pace'
+export type { PaceLetter, FacilityPace, FacilityPaceEntry, TreatmentPace, TreatmentPaceEntry } from './med/pace'
 export { buildFacilityPace, buildTreatmentPace } from './med/pace'
 
 // ── Echelons of care ─────────────────────────────────────────────────────────
