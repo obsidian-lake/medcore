@@ -95,7 +95,14 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                 </div>
               )}
               {fac.phone && <div style={{ fontSize: 9, color: '#81c784' }}>Ph: {fac.phone}</div>}
-              {fac.address && <div style={{ fontSize: 9, color: '#6a9a6a' }}>{fac.address.slice(0, 50)}</div>}
+              {fac.address && (
+                <div
+                  data-maps-url={`https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}`}
+                  style={{ fontSize: 9, color: '#6a9a6a' }}
+                >
+                  {fac.address.slice(0, 50)}
+                </div>
+              )}
             </td>
             <td style={{ padding: '4px 4px', fontSize: 11, color: entry.transit.groundDurationS && entry.transit.groundDurationS <= 3600 ? '#4caf50' : '#ffcc02' }}>
               {formatTransit(entry.transit.groundDurationS)}
@@ -167,14 +174,6 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
         {state.opName && <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#c8e6c9' }}>{state.opName}</span>}
         {state.unitName && <span style={{ fontSize: 12, color: '#81c784' }}>{state.unitName}</span>}
         <span style={{ flex: 1 }} />
-        <span style={{
-          fontSize: 10, letterSpacing: 1,
-          padding: '2px 8px', borderRadius: 3,
-          border: `1px solid ${state.environment === 'operational' ? '#ffcc02' : '#4caf50'}`,
-          color: state.environment === 'operational' ? '#ffcc02' : '#4caf50',
-        }}>
-          {state.environment.toUpperCase()}
-        </span>
         <span style={{ fontSize: 11, color: '#6a9a6a' }}>{today}</span>
       </div>
 
