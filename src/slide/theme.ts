@@ -59,7 +59,7 @@ export const SLIDE_THEMES: Record<SlideThemeId, SlideTheme> = {
   'mission-planning': {
     id:           'mission-planning',
     headerStyle:  'thick',
-    bg:           '#111111',
+    bg:           '#000000',
     headerBg:     '#000000',
     headerText:   '#ffffff',
     headerLabel:  '#aaaaaa',
