@@ -42,7 +42,7 @@ export const SLIDE_THEMES: Record<SlideThemeId, SlideTheme> = {
     id:           'field-green',
     headerStyle:  'thin',
     bg:           '#0d1a0d',
-    headerBg:     '#0d1a0d',
+    headerBg:     '#000000',
     headerText:   '#4caf50',
     headerLabel:  '#6a9a6a',
     headerBorder: '#2e4a2e',
