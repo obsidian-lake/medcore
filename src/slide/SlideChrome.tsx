@@ -53,16 +53,18 @@ export function SlideChrome({
       boxSizing:     'border-box' as const,
     }}>
 
-      <ClassificationBar color={brand.classification.color} label={brand.classification.label} edge="top" bgColor={theme.bg} />
-
-      <SlideHeader
-        theme={theme}
-        title={title}
-        dzName={dzName}
-        leftLabel={leftLabel}
-        logoLeft={brand.logoLeft}
-        logoRight={brand.logoRight}
-      />
+      {/* Top chrome: class bar + header share a background so the gap in the bar blends in */}
+      <div style={{ background: theme.headerBg, flexShrink: 0 }}>
+        <ClassificationBar color={brand.classification.color} label={brand.classification.label} edge="top" bgColor={theme.headerBg} />
+        <SlideHeader
+          theme={theme}
+          title={title}
+          dzName={dzName}
+          leftLabel={leftLabel}
+          logoLeft={brand.logoLeft}
+          logoRight={brand.logoRight}
+        />
+      </div>
 
       {/* Content */}
       <div style={{
