@@ -59,6 +59,20 @@ export { detectCountryCode } from './util/countryCode'
 export type { ComputeMedPlanInput, MedPlanResult } from './computeMedPlan'
 export { computeMedPlan } from './computeMedPlan'
 
+// ── Slide template / branding system ─────────────────────────────────────────
+export type { SlideThemeId, SlideTheme, HeaderStyle } from './slide/theme'
+export { SLIDE_W, SLIDE_H, CLASS_BAR_H, HEADER_H_THIN, HEADER_H_THICK, FOOTER_H, SLIDE_PAD_H, SLIDE_PAD_V, SLIDE_THEMES } from './slide/theme'
+export type { BrandConfig } from './slide/brand'
+export { DEFAULT_BRAND, CLASS_PRESET_COLORS } from './slide/brand'
+export { ClassificationBar } from './slide/ClassificationBar'
+export { SlideHeader } from './slide/SlideHeader'
+export { SlideChrome } from './slide/SlideChrome'
+// Layout primitives for the Mission Planning tool (and any future suite app)
+export { TitleSlide as MpTitleSlide } from './slide/layouts/TitleSlide'
+export { BulletSlide as MpBulletSlide } from './slide/layouts/BulletSlide'
+export { TwoColSlide as MpTwoColSlide } from './slide/layouts/TwoColSlide'
+export { GraphicSlide as MpGraphicSlide } from './slide/layouts/GraphicSlide'
+
 // ── MedSlide component ────────────────────────────────────────────────────────
 export type { MedSlideInput } from './slide/MedSlide'
 export { MedSlide } from './slide/MedSlide'

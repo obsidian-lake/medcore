@@ -28,6 +28,8 @@ import { formatTransit } from '../med/rank'
 import type { EchelonPlan } from '../med/echelon'
 import { latLonToMgrs } from '../calc/geo'
 import { formatTricareLanguageNote } from '../med/tricareLanguage'
+import type { BrandConfig } from './brand'
+import { SlideChrome } from './SlideChrome'
 
 /**
  * Slim input type for the MedSlide component.
@@ -59,6 +61,8 @@ interface Props {
   echelonPlan?: EchelonPlan | null
   /** PNG data URL for a QR code that shares / downloads this plan. */
   qrDataUrl?: string
+  /** When provided, renders with shared SlideChrome (class bars, theme, logos). */
+  brand?: BrandConfig
 }
 
 const SLIDE_W = 1280
@@ -133,52 +137,15 @@ function FacilityPaceHeader() {
   )
 }
 
-export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ state, facilityPace, chamberPace, treatmentPace, echelonPlan, qrDataUrl }, ref) {
+export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ state, facilityPace, chamberPace, treatmentPace, echelonPlan, qrDataUrl, brand }, ref) {
   const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
   // Display target in MGRS (internal lat/lon stored as numbers; convert for display)
   const targetStr = state.targetLat !== 0
     ? latLonToMgrs(state.targetLat, state.targetLon)
     : '—'
 
-  return (
-    <div
-      ref={ref}
-      data-slide
-      style={{
-        width: SLIDE_W,
-        height: SLIDE_H,
-        background: '#0d1a0d',
-        color: '#c8e6c9',
-        fontFamily: "'Courier New', Courier, monospace",
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-        flexShrink: 0,
-        position: 'relative',
-      }}
-    >
-
-      {/* ── HEADER ──────────────────────────────────────────────────────────── */}
-      <div style={{
-        height: 44,
-        background: '#1a2a1a',
-        borderBottom: '1px solid #2a4a2a',
-        display: 'flex',
-        alignItems: 'center',
-        padding: '0 16px',
-        gap: 16,
-        flexShrink: 0,
-      }}>
-        <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: 3, color: '#4caf50' }}>MED PLAN</span>
-        <span style={{ color: '#2a4a2a' }}>│</span>
-        {state.opName && <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#c8e6c9' }}>{state.opName}</span>}
-        {state.unitName && <span style={{ fontSize: 12, color: '#81c784' }}>{state.unitName}</span>}
-        <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 11, color: '#6a9a6a' }}>{today}</span>
-      </div>
-
-      {/* ── BODY ────────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+  const paceBody = (
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
         {/* Left: PACE tables */}
         <div style={{ width: 640, flexShrink: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRight: '1px solid #2a4a2a' }}>
@@ -345,8 +312,60 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
           </span>
         </div>
       </div>
+  )  // end paceBody
 
-      {/* ── FOOTER ──────────────────────────────────────────────────────────── */}
+  // ── Render: shared chrome path (brand provided) ────────────────────────────
+  if (brand) {
+    const opLabel = [state.opName, state.unitName].filter(Boolean).join(' · ') || undefined
+    return (
+      <div
+        ref={ref}
+        data-slide
+        style={{ width: SLIDE_W, height: SLIDE_H, overflow: 'hidden', boxSizing: 'border-box' as const }}
+      >
+        <SlideChrome brand={brand} title="MED PLAN" dzName={opLabel} date={today} footerRight="MED PLAN">
+          {paceBody}
+        </SlideChrome>
+      </div>
+    )
+  }
+
+  // ── Render: legacy standalone layout (no brand — backward compat) ──────────
+  return (
+    <div
+      ref={ref}
+      data-slide
+      style={{
+        width: SLIDE_W, height: SLIDE_H,
+        background: '#0d1a0d', color: '#c8e6c9',
+        fontFamily: "'Courier New', Courier, monospace",
+        display: 'flex', flexDirection: 'column',
+        overflow: 'hidden', flexShrink: 0, position: 'relative',
+      }}
+    >
+      {/* ── LEGACY HEADER ─────────────────────────────────────────────────── */}
+      <div style={{
+        height: 44, background: '#1a2a1a', borderBottom: '1px solid #2a4a2a',
+        display: 'flex', alignItems: 'center', padding: '0 16px', gap: 16, flexShrink: 0,
+      }}>
+        <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: 3, color: '#4caf50' }}>MED PLAN</span>
+        <span style={{ color: '#2a4a2a' }}>│</span>
+        {state.opName && <span style={{ fontWeight: 700, fontSize: 12, letterSpacing: 2, color: '#c8e6c9' }}>{state.opName}</span>}
+        {state.unitName && <span style={{ fontSize: 12, color: '#81c784' }}>{state.unitName}</span>}
+        <span style={{ flex: 1 }} />
+        <span style={{
+          fontSize: 10, letterSpacing: 1, padding: '2px 8px', borderRadius: 3,
+          border: `1px solid ${state.environment === 'operational' ? '#ffcc02' : '#4caf50'}`,
+          color: state.environment === 'operational' ? '#ffcc02' : '#4caf50',
+        }}>
+          {state.environment.toUpperCase()}
+        </span>
+        <span style={{ fontSize: 11, color: '#6a9a6a' }}>{today}</span>
+      </div>
+
+      {paceBody}
+
+      {/* ── LEGACY FOOTER ─────────────────────────────────────────────────── */}
       <div style={{
         height: 40,
         background: '#1a2a1a',

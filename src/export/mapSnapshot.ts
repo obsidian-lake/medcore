@@ -429,6 +429,7 @@ export async function renderMedMapToCanvas(
   chamberPace?:        FacilityPace | null,
 ): Promise<HTMLCanvasElement | undefined> {
   const log = (msg: string) => onProgress?.(msg)
+  const safeRoutes: Record<string, RouteResult> = groundRoutes ?? {}
 
   const L = await import('leaflet')
 
@@ -488,7 +489,7 @@ export async function renderMedMapToCanvas(
       bounds.push([fac.lat, fac.lon])
 
       // Ground route
-      const route = groundRoutes[fac.id]
+      const route = safeRoutes[fac.id]
       if (route && route.polyline.length > 1) {
         const latlngs = route.polyline.map(([ln, lt]) => [lt, ln] as [number, number])
         ;(L as any).polyline(latlngs, {
@@ -548,7 +549,7 @@ export async function renderMedMapToCanvas(
       bounds.push([chamberPrimary.lat, chamberPrimary.lon])
 
       // Ground route to chamber primary (fetched during App.tsx chamber route pass)
-      const cpRoute = groundRoutes[chamberPrimary.id]
+      const cpRoute = safeRoutes[chamberPrimary.id]
       if (cpRoute && cpRoute.polyline.length > 1) {
         const latlngs = cpRoute.polyline.map(([ln, lt]) => [lt, ln] as [number, number])
         ;(L as any).polyline(latlngs, {
@@ -603,7 +604,7 @@ export async function renderMedMapToCanvas(
     // ── Echelon PiP inset ───────────────────────────────────────────────────
     if (echelonPlan) {
       log('Imagery: rendering echelon inset…')
-      const insetCanvas = await renderEchelonInsetCanvas(L, target, echelonPlan, facilityPace, groundRoutes)
+      const insetCanvas = await renderEchelonInsetCanvas(L, target, echelonPlan, facilityPace, safeRoutes)
       if (insetCanvas) blitEchelonInset(canvas, insetCanvas, obstaclesPx, targetPx)
     }
 
