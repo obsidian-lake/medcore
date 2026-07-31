@@ -67,6 +67,7 @@ export { DEFAULT_BRAND, CLASS_PRESET_COLORS } from './slide/brand'
 export { ClassificationBar } from './slide/ClassificationBar'
 export { SlideHeader } from './slide/SlideHeader'
 export { SlideChrome } from './slide/SlideChrome'
+export { BrandEditor } from './slide/BrandEditor'
 // Layout primitives for the Mission Planning tool (and any future suite app)
 export { TitleSlide as MpTitleSlide } from './slide/layouts/TitleSlide'
 export { BulletSlide as MpBulletSlide } from './slide/layouts/BulletSlide'
