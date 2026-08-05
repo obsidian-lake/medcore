@@ -52,12 +52,18 @@ export type { ComposeOptions, Arrow } from './export/composeMapCanvas'
 export { composeMapCanvas } from './export/composeMapCanvas'
 export { renderMedMapToCanvas } from './export/mapSnapshot'
 
+// ── PDF link annotations ─────────────────────────────────────────────────────
+export type { LinkAnnotation } from './export/pdfLinkAnnotations'
+export { collectLinkAnnotations } from './export/pdfLinkAnnotations'
+
 // ── Country code detection ────────────────────────────────────────────────────
 export { detectCountryCode } from './util/countryCode'
 
 // ── Full pipeline ─────────────────────────────────────────────────────────────
 export type { ComputeMedPlanInput, MedPlanResult } from './computeMedPlan'
 export { computeMedPlan } from './computeMedPlan'
+export type { UseMedPlanGenerationResult } from './useMedPlanGeneration'
+export { useMedPlanGeneration } from './useMedPlanGeneration'
 
 // ── Slide template / branding system ─────────────────────────────────────────
 export type { SlideThemeId, SlideTheme, HeaderStyle } from './slide/theme'
