@@ -88,7 +88,7 @@ export async function computeMedPlan(
 
   // 1. OSM Overpass
   progress('Querying OSM Overpass…')
-  const { hospitals: osmFacilities } = await fetchOverpass(target, searchRadius)
+  const { hospitals: osmFacilities, reducedRadiusM } = await fetchOverpass(target, searchRadius)
 
   // 2. HIFLD (CONUS only)
   let hifldFacilities: Awaited<ReturnType<typeof fetchHifld>> = []
@@ -195,6 +195,15 @@ export async function computeMedPlan(
     allFacilities: finalMerged,
     poolMode: 'trauma',
   })
+
+  if (reducedRadiusM) {
+    facilityPace = {
+      ...facilityPace,
+      warnings: [...facilityPace.warnings,
+        `⚠ Search radius reduced to ${reducedRadiusM / 1000} km (Overpass timeout at ${searchRadius / 1000} km) — reload facilities for full coverage.`
+      ],
+    }
+  }
 
   if (levelINotFoundWarning) {
     facilityPace = { ...facilityPace, warnings: [...facilityPace.warnings, levelINotFoundWarning] }

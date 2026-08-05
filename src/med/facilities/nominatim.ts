@@ -119,6 +119,7 @@ export async function enrichOsmAddresses(
           'Accept-Language': 'en',
           'User-Agent': 'medplanner-pipehittertools/1.0 (codeword.actual@erine.eu)',
         },
+        signal: AbortSignal.timeout(10_000),
       })
       if (!resp.ok) throw new Error(`Nominatim HTTP ${resp.status}`)
       const items = await resp.json() as NominatimItem[]

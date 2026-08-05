@@ -273,6 +273,8 @@ export function parseElement(el: RawElement): { hospital?: Omit<OsmFacility, 'ha
 export interface OverpassResult {
   hospitals: OsmFacility[]
   helipads: OsmHelipad[]
+  /** Set when the full requested radius timed out and results were fetched at a smaller radius. */
+  reducedRadiusM?: number
 }
 
 /**
@@ -349,6 +351,27 @@ async function fetchFromMirrors(encoded: string): Promise<{ elements: RawElement
   }
 }
 
+/** Parse raw Overpass elements into hospitals and helipads, associating helipads to nearby hospitals. */
+function parseElements(elements: RawElement[]): { hospitals: OsmFacility[]; helipads: OsmHelipad[] } {
+  const rawHospitals: Omit<OsmFacility, 'hasHelipad'>[] = []
+  const helipads: OsmHelipad[] = []
+
+  for (const el of elements) {
+    const parsed = parseElement(el)
+    if (parsed.hospital) rawHospitals.push(parsed.hospital)
+    if (parsed.helipad) helipads.push(parsed.helipad)
+  }
+
+  const hospitals: OsmFacility[] = rawHospitals.map(h => {
+    const nearHelipad = helipads.some(hp =>
+      haversineM({ lat: h.lat, lon: h.lon }, { lat: hp.lat, lon: hp.lon }) <= HELIPAD_ASSOC_RADIUS_M
+    )
+    return { ...h, hasHelipad: nearHelipad }
+  })
+
+  return { hospitals, helipads }
+}
+
 /**
  * Fetch hospitals and helipads around a target from the OSM Overpass API.
  *
@@ -368,51 +391,60 @@ export async function fetchOverpass(
     if (cached) return { hospitals: cached.hospitals, helipads: cached.helipads }
   }
 
-  const query   = buildQuery(target.lat, target.lon, radiusM)
-  const encoded = encodeURIComponent(query)
-
+  // Effective radius may be reduced if the full-radius query times out (see fallback below).
+  let effectiveRadiusM = radiusM
   let data: { elements: RawElement[] }
+
   try {
-    data = await fetchFromMirrors(encoded)
+    data = await fetchFromMirrors(encodeURIComponent(buildQuery(target.lat, target.lon, radiusM)))
   } catch (firstErr) {
-    // First attempt failed — wait briefly and retry once before falling back to
-    // stale cache or throwing. Transient 504s / mirror overload often resolve
-    // within a few seconds.
+    // First attempt failed — wait briefly and retry once. Transient 504s / mirror
+    // overload often resolve within a few seconds.
     try {
       await new Promise(r => setTimeout(r, 3_000))
-      data = await fetchFromMirrors(encoded)
+      data = await fetchFromMirrors(encodeURIComponent(buildQuery(target.lat, target.lon, radiusM)))
     } catch (err) {
-      // Both attempts failed — try stale cache rather than surfacing an error
+      // Both attempts at full radius failed — check stale cache first.
       const stale = readCache(key)
       if (stale) {
         console.warn('[overpass] all endpoints failed (2 attempts), using stale cache:', err)
         return { hospitals: stale.hospitals, helipads: stale.helipads }
       }
-      throw err
+
+      // Large-radius queries (>60 km) frequently exhaust Overpass server memory on cold
+      // start. Fall back to 50 km: lighter query, almost always succeeds, and warms the
+      // server so a subsequent full-radius reload usually works.
+      if (radiusM > 60_000) {
+        const fallbackR = 50_000
+        const fallbackKey = cacheKey(target.lat, target.lon, fallbackR)
+        const cachedFallback = readCache(fallbackKey)
+        if (cachedFallback) {
+          console.warn(`[overpass] ${radiusM}m failed — using cached ${fallbackR}m result`)
+          return { hospitals: cachedFallback.hospitals, helipads: cachedFallback.helipads, reducedRadiusM: fallbackR }
+        }
+        try {
+          data = await fetchFromMirrors(encodeURIComponent(buildQuery(target.lat, target.lon, fallbackR)))
+          effectiveRadiusM = fallbackR
+          console.warn(`[overpass] ${radiusM}m query failed — fell back to ${fallbackR}m`)
+        } catch {
+          throw err
+        }
+      } else {
+        throw err
+      }
     }
   }
 
-  const rawHospitals: Omit<OsmFacility, 'hasHelipad'>[] = []
-  const helipads: OsmHelipad[] = []
-
-  for (const el of data.elements) {
-    const parsed = parseElement(el)
-    if (parsed.hospital) rawHospitals.push(parsed.hospital)
-    if (parsed.helipad) helipads.push(parsed.helipad)
-  }
-
-  // Associate helipads to hospitals
-  const hospitals: OsmFacility[] = rawHospitals.map(h => {
-    const nearHelipad = helipads.some(hp =>
-      haversineM({ lat: h.lat, lon: h.lon }, { lat: hp.lat, lon: hp.lon }) <= HELIPAD_ASSOC_RADIUS_M
-    )
-    return { ...h, hasHelipad: nearHelipad }
-  })
+  const { hospitals, helipads } = parseElements(data.elements)
 
   const entry: CacheEntry = { ts: Date.now(), hospitals, helipads }
-  writeCache(key, entry)
+  writeCache(cacheKey(target.lat, target.lon, effectiveRadiusM), entry)
 
-  return { hospitals, helipads }
+  return {
+    hospitals,
+    helipads,
+    ...(effectiveRadiusM < radiusM ? { reducedRadiusM: effectiveRadiusM } : {}),
+  }
 }
 
 /**

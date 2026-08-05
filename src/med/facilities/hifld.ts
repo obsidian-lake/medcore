@@ -211,7 +211,7 @@ export async function fetchHifld(target: LatLon, radiusM = 80_000): Promise<Hifl
 
   let resp: Response
   try {
-    resp = await fetch(`${HIFLD_BASE_URL}?${params}`)
+    resp = await fetch(`${HIFLD_BASE_URL}?${params}`, { signal: AbortSignal.timeout(15_000) })
     if (!resp.ok) throw new Error(`HIFLD HTTP ${resp.status}`)
   } catch (err) {
     console.warn('[hifld] fetch failed — falling back to OSM only:', err)

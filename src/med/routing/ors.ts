@@ -179,6 +179,7 @@ export async function getGroundRoute(from: LatLon, to: LatLon): Promise<RouteRes
         instructions: false,
         geometry_simplify: true,
       }),
+      signal: AbortSignal.timeout(15_000),
     })
 
     if (!resp.ok) {
@@ -243,6 +244,7 @@ export async function getRouteMatrix(
       method: 'POST',
       headers: { 'Authorization': apiKey, 'Content-Type': 'application/json' },
       body: JSON.stringify({ locations: coords, sources, destinations: dests, metrics: ['duration'] }),
+      signal: AbortSignal.timeout(20_000),
     })
     if (!resp.ok) {
       if (resp.status === 401 || resp.status === 403) recordOrsFailure({ kind: 'auth', status: resp.status })
@@ -292,6 +294,7 @@ export async function getIsochrone60min(origin: LatLon): Promise<IsochroneResult
         range_type: 'time',
         smoothing: 25,
       }),
+      signal: AbortSignal.timeout(15_000),
     })
     if (!resp.ok) throw new Error(`ORS Isochrone HTTP ${resp.status}`)
     const json = await resp.json() as { features: [{ geometry: GeoJSON.Polygon }] }
