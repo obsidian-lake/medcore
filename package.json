@@ -8,6 +8,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@pipehitter/medcore": "github:obsidian-lake/medcore",
     "geographiclib-geodesic": "^2.2.0",
     "mgrs": "^2.1.0"
   },

@@ -10,7 +10,7 @@ export interface BrandConfig {
 }
 
 export const DEFAULT_BRAND: BrandConfig = {
-  themeId:        'field-green',
+  themeId:        'mission-planning',
   classification: { color: '#4caf50', label: 'UNCLASSIFIED' },
 }
 
