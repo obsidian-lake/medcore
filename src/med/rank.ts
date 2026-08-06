@@ -260,6 +260,14 @@ export function transitColorClass(s: number | null): string {
 }
 
 /**
+ * Hex-colour equivalent of transitColorClass(), for surfaces that render
+ * directly to a colour (DOM inline styles, PPTX cell fills) rather than CSS classes.
+ */
+export function transitColorHex(s: number | null): string {
+  return s !== null && s <= GOLDEN_HOUR_S ? '#4caf50' : '#ffcc02'
+}
+
+/**
  * Derive care level display label.
  * Delegates to careLevelLabel() — single source of truth for Level I–IV wording.
  */

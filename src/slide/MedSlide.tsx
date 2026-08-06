@@ -24,7 +24,8 @@
 
 import { forwardRef } from 'react'
 import type { FacilityPace, FacilityPaceEntry, TreatmentPace } from '../med/pace'
-import { formatTransit } from '../med/rank'
+import { paceLetterColor } from '../med/pace'
+import { formatTransit, transitColorHex } from '../med/rank'
 import { careLevelRoman } from '../med/careLevel'
 import type { EchelonPlan } from '../med/echelon'
 import { latLonToMgrs } from '../calc/geo'
@@ -69,16 +70,6 @@ interface Props {
 const SLIDE_W = 1280
 const SLIDE_H = 720
 
-function paceLetterColor(letter: string): string {
-  switch (letter) {
-    case 'P': return '#4caf50'
-    case 'A': return '#2196f3'
-    case 'C': return '#ff9800'
-    case 'E': return '#e53935'
-    default:   return '#c8e6c9'
-  }
-}
-
 /** Shared facility PACE table rows (reused for both hospital and chamber tables in dive mode). */
 function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable'> }) {
   return (
@@ -117,7 +108,7 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                 </div>
               )}
             </td>
-            <td style={{ padding: '4px 4px', fontSize: 11, color: entry.transit.groundDurationS && entry.transit.groundDurationS <= 3600 ? '#4caf50' : '#ffcc02' }}>
+            <td style={{ padding: '4px 4px', fontSize: 11, color: transitColorHex(entry.transit.groundDurationS) }}>
               {formatTransit(entry.transit.groundDurationS)}
             </td>
             <td style={{ padding: '4px 4px', fontSize: 11, color: '#81c784' }}>

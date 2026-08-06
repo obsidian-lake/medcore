@@ -47,6 +47,21 @@ import { formatTransit } from './rank'
 
 export type PaceLetter = 'P' | 'A' | 'C' | 'E'
 
+/**
+ * Canonical PACE-letter display colour, shared by every rendered PACE table
+ * (DOM slide, native PPTX export, in-app screens) so the palette can't drift
+ * between surfaces.
+ */
+export function paceLetterColor(letter: string): string {
+  switch (letter) {
+    case 'P': return '#4caf50'
+    case 'A': return '#2196f3'
+    case 'C': return '#ff9800'
+    case 'E': return '#e53935'
+    default:  return '#c8e6c9'
+  }
+}
+
 export interface FacilityPaceEntry {
   letter: PaceLetter
   facility: FacilityRecord

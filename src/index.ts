@@ -11,7 +11,12 @@ export { mgrsToLatLon, latLonToMgrs, destination, inverse, backAzimuth, trueToGr
 
 // ── Care-level domain ─────────────────────────────────────────────────────────
 export type { CareTier, CapabilityFlag } from './med/careLevel'
-export { careLevelRoman, ALL_CAPABILITY_FLAGS, careLevelLabel, tierLabel } from './med/careLevel'
+export {
+  careLevelRoman, ALL_CAPABILITY_FLAGS, careLevelLabel, tierLabel,
+  usTraumaLevelToTier, ukClassificationToTier, osmHeuristicTier,
+  isPediatricOnly, inferCapsFromName, inferCapsFromClassifiedTier,
+  inferCapsFromTraumaLevel, hifldServiceLinesToCaps, osmSpecialitiesToCaps,
+} from './med/careLevel'
 
 // ── Facilities ────────────────────────────────────────────────────────────────
 export type { FacilityRecord } from './med/facilities/merge'
@@ -29,12 +34,12 @@ export type { RouteResult, IsochroneResult } from './med/routing/ors'
 export { getRouteMatrix, getGroundRoute, getIsochrone60min, heloTransitS, DEFAULT_HELO_SPEED_KT, FIXED_WING_SPEED_KT, AIRFRAMES, resetOrsFailure, getOrsFailure } from './med/routing/ors'
 
 // ── Ranking ───────────────────────────────────────────────────────────────────
-export type { FacilityScore, RankResult } from './med/rank'
-export { rankFacilities, formatTransit } from './med/rank'
+export type { FacilityScore, RankResult, TransitInfo, RankInput, PhasedRecommendation } from './med/rank'
+export { rankFacilities, formatTransit, transitColorClass, transitColorHex, tierDisplayLabel } from './med/rank'
 
 // ── PACE plans ────────────────────────────────────────────────────────────────
 export type { PaceLetter, FacilityPace, FacilityPaceEntry, TreatmentPace, TreatmentPaceEntry } from './med/pace'
-export { buildFacilityPace, buildTreatmentPace } from './med/pace'
+export { buildFacilityPace, buildTreatmentPace, paceLetterColor } from './med/pace'
 
 // ── Echelons of care ─────────────────────────────────────────────────────────
 export type { EchelonNodes, EchelonPlan } from './med/echelon'
