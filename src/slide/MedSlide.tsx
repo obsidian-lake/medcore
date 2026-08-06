@@ -81,15 +81,15 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
           <tr key={entry.letter} style={{ borderBottom: '1px solid #1a2a1a' }}>
             <td style={{ padding: '4px 4px', fontWeight: 700, fontSize: 13, color }}>{entry.letter}</td>
             <td style={{ padding: '4px 4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ fontWeight: 700, fontSize: 12, color: '#c8e6c9' }}>{fac.name}</span>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, color: '#0d1a0d', background: '#81c784',
-                  borderRadius: 3, padding: '0 4px', letterSpacing: 0.5, flexShrink: 0,
-                }}>
-                  LVL {careLevelRoman(fac.tier)}
-                </span>
-              </div>
+              <span style={{
+                display: 'inline-block', fontSize: 9, fontWeight: 700, color: '#0d1a0d', background: '#81c784',
+                borderRadius: 3, padding: '0 4px', letterSpacing: 0.5,
+              }}>
+                LVL {careLevelRoman(fac.tier)}
+              </span>
+            </td>
+            <td style={{ padding: '4px 4px' }}>
+              <span style={{ fontWeight: 700, fontSize: 12, color: '#c8e6c9' }}>{fac.name}</span>
               {entry.phasedNote && <div style={{ fontSize: 9, color: '#ffcc02', marginTop: 1 }}>⚠ {entry.phasedNote}</div>}
               {fac.capabilities.length > 0 && (
                 <div style={{ fontSize: 9, color: '#6a9a6a', marginTop: 1 }}>
@@ -129,7 +129,7 @@ function FacilityPaceHeader() {
   return (
     <thead>
       <tr style={{ borderBottom: '1px solid #2a4a2a' }}>
-        {['', 'FACILITY', 'GROUND', 'HELO', 'PAD'].map(h => (
+        {['', 'LVL', 'FACILITY', 'GROUND', 'HELO', 'PAD'].map(h => (
           <th key={h} style={{ textAlign: 'left', padding: '2px 4px', fontSize: 9, letterSpacing: 1, color: '#6a9a6a', fontWeight: 600 }}>{h}</th>
         ))}
       </tr>
@@ -162,7 +162,7 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
                 {facilityPace ? (
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
                     <colgroup>
-                      <col style={{ width: 18 }} /><col /><col style={{ width: 80 }} /><col style={{ width: 60 }} /><col style={{ width: 40 }} />
+                      <col style={{ width: 18 }} /><col style={{ width: 36 }} /><col /><col style={{ width: 80 }} /><col style={{ width: 60 }} /><col style={{ width: 40 }} />
                     </colgroup>
                     <FacilityPaceHeader />
                     <FacilityPaceRows entries={facilityPace.entries} state={state} />
@@ -204,6 +204,7 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
                   <colgroup>
                     <col style={{ width: 18 }} />
+                    <col style={{ width: 40 }} />
                     <col />
                     <col style={{ width: 90 }} />
                     <col style={{ width: 70 }} />

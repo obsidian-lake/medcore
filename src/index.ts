@@ -56,6 +56,7 @@ export type { MapLabel } from './types/mapLabel'
 export type { ComposeOptions, Arrow } from './export/composeMapCanvas'
 export { composeMapCanvas } from './export/composeMapCanvas'
 export { renderMedMapToCanvas } from './export/mapSnapshot'
+export { applyPolylineOffsetPatch, assignRouteOffsets, DEFAULT_OFFSET_GAP_PX } from './export/polylineOffset'
 
 // ── PDF link annotations ─────────────────────────────────────────────────────
 export type { LinkAnnotation } from './export/pdfLinkAnnotations'

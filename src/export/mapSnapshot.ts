@@ -20,6 +20,7 @@ import type { RouteResult } from '../med/routing/ors'
 import type { EchelonPlan } from '../med/echelon'
 import { LEG2_DROP_GROUND_DIST_M } from '../med/echelon'
 import { composeMapCanvas } from './composeMapCanvas'
+import { applyPolylineOffsetPatch, assignRouteOffsets } from './polylineOffset'
 import type { MapLabel } from '../types/mapLabel'
 import { formatTransit } from '../med/rank'
 import { inverse } from '../calc/geo'
@@ -439,6 +440,7 @@ export async function renderMedMapToCanvas(
 
   try {
     delete (L.Icon.Default.prototype as any)._getIconUrl
+    applyPolylineOffsetPatch(L)
 
     const map = (L as any).map(container, {
       center:              [target.lat, target.lon],
@@ -474,7 +476,15 @@ export async function renderMedMapToCanvas(
       ? facilities.filter(f => paceIds.has(f.id) && f.id !== echelonDefId)
       : facilities.filter(f => f.id !== echelonDefId)
 
+    // Pixel offsets so routes to different facilities that share the same road
+    // render side by side instead of stacking on top of each other.
+    const chamberPrimaryId = chamberPace?.entries.find(e => e.letter === 'P')?.facility.id ?? null
+    const routeIds = renderFacilities.map(f => f.id)
+    if (chamberPrimaryId && !routeIds.includes(chamberPrimaryId)) routeIds.push(chamberPrimaryId)
+    const routeOffsets = assignRouteOffsets(routeIds)
+
     for (const fac of renderFacilities) {
+      const routeOffset = routeOffsets.get(fac.id) ?? 0
       const paceLetter = paceLetterForFacility(fac.id, facilityPace)
       const color = paceLetter ? paceLetterColor(paceLetter) : tierColor(fac.tier)
       const levelStr = `Lvl ${careLevelRoman(fac.tier as 1 | 2 | 3 | 4)}`
@@ -495,6 +505,7 @@ export async function renderMedMapToCanvas(
         ;(L as any).polyline(latlngs, {
           color, weight: route.estimated ? 1.5 : 2.5,
           dashArray: route.estimated ? '6 4' : undefined, opacity: 0.8,
+          offset: routeOffset,
         }).addTo(map)
         const mid = latlngs[Math.floor(latlngs.length / 2)]
         if (mid) {
@@ -507,7 +518,7 @@ export async function renderMedMapToCanvas(
       } else if (!rotaryWingAvailable || !fac.hasHelipad) {
         ;(L as any).polyline(
           [[target.lat, target.lon], [fac.lat, fac.lon]],
-          { color, weight: 1.5, dashArray: '4 8', opacity: 0.45 }
+          { color, weight: 1.5, dashArray: '4 8', opacity: 0.45, offset: routeOffset }
         ).addTo(map)
       }
 
@@ -517,7 +528,7 @@ export async function renderMedMapToCanvas(
         const heloS = Math.round((distM / 1852) / heloSpeedKt * 3600)
         ;(L as any).polyline(
           [[target.lat, target.lon], [fac.lat, fac.lon]],
-          { color, weight: 2.5, dashArray: '3 5', opacity: 0.6 }
+          { color, weight: 2.5, dashArray: '3 5', opacity: 0.6, offset: routeOffset }
         ).addTo(map)
         const midLat = (target.lat + fac.lat) / 2
         const midLon = (target.lon + fac.lon) / 2
@@ -536,6 +547,7 @@ export async function renderMedMapToCanvas(
     const chamberPrimary = chamberPace?.entries.find(e => e.letter === 'P')?.facility ?? null
     if (chamberPrimary) {
       const cpColor = paceLetterColor('P')  // #4caf50 — same green as standard primary
+      const cpOffset = routeOffsets.get(chamberPrimary.id) ?? 0
       ;(L as any).circleMarker([chamberPrimary.lat, chamberPrimary.lon], {
         radius: 6, color: cpColor, fillColor: cpColor, fillOpacity: 0.9, weight: 2.5,
       }).addTo(map)
@@ -555,6 +567,7 @@ export async function renderMedMapToCanvas(
         ;(L as any).polyline(latlngs, {
           color: cpColor, weight: cpRoute.estimated ? 1.5 : 2.5,
           dashArray: cpRoute.estimated ? '6 4' : undefined, opacity: 0.8,
+          offset: cpOffset,
         }).addTo(map)
         const mid = latlngs[Math.floor(latlngs.length / 2)]
         if (mid) {
@@ -563,7 +576,7 @@ export async function renderMedMapToCanvas(
       } else {
         ;(L as any).polyline(
           [[target.lat, target.lon], [chamberPrimary.lat, chamberPrimary.lon]],
-          { color: cpColor, weight: 1.5, dashArray: '4 8', opacity: 0.45 }
+          { color: cpColor, weight: 1.5, dashArray: '4 8', opacity: 0.45, offset: cpOffset }
         ).addTo(map)
       }
     }
