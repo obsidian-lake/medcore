@@ -21,7 +21,7 @@ export function SlideHeader({
   theme,
   title,
   dzName,
-  leftLabel = 'MFF JM PLANNER',
+  leftLabel,
   logoLeft,
   logoRight,
 }: Props) {
@@ -54,7 +54,7 @@ export function SlideHeader({
             alt=""
             style={{ height: logoH, width: 'auto', maxWidth: SLOT_W, objectFit: 'contain', flexShrink: 0 }}
           />
-        ) : (
+        ) : leftLabel ? (
           <span style={{
             fontSize:      isThin ? 11 : 12,
             color:         theme.headerLabel,
@@ -64,7 +64,7 @@ export function SlideHeader({
           }}>
             {leftLabel}
           </span>
-        )}
+        ) : null}
       </div>
 
       {/* ── Center: title (+ optional dzName subtitle) ── */}
