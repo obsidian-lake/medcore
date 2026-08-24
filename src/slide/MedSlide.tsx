@@ -70,6 +70,12 @@ interface Props {
 const SLIDE_W = 1280
 const SLIDE_H = 720
 
+/** Normalize a facility phone string (any punctuation/spacing) into a tel: URI. */
+function toTelHref(phone: string): string {
+  const digits = phone.replace(/[^\d+]/g, '').replace(/(?!^)\+/g, '')
+  return `tel:${digits}`
+}
+
 /** Shared facility PACE table rows (reused for both hospital and chamber tables in dive mode). */
 function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable'> }) {
   return (
@@ -98,7 +104,15 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                   ).join(' · ')}
                 </div>
               )}
-              {fac.phone && <div style={{ fontSize: 9, color: '#81c784' }}>Ph: {fac.phone}</div>}
+              {fac.phone && (
+                <a
+                  href={toTelHref(fac.phone)}
+                  data-tel-url={toTelHref(fac.phone)}
+                  style={{ fontSize: 9, color: '#81c784', textDecoration: 'none', display: 'block' }}
+                >
+                  Ph: {fac.phone}
+                </a>
+              )}
               {fac.address && (
                 <div
                   data-maps-url={`https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}`}

@@ -3,7 +3,8 @@
  *
  * Tests:
  *  - Converts a [data-maps-url] element's DOM rect into page-coordinate fractions
- *  - Skips elements without a data-maps-url attribute
+ *  - Converts a [data-tel-url] element's DOM rect into page-coordinate fractions
+ *  - Skips elements without a data-maps-url/data-tel-url attribute
  *  - Returns [] when the slide element has zero size (not yet laid out)
  */
 import { describe, expect, it } from 'vitest'
@@ -37,6 +38,25 @@ describe('collectLinkAnnotations', () => {
       w: (128 / 1280) * 297,
       h: (36 / 720) * 167.0625,
       url: 'https://maps.example/?q=1,2',
+    }])
+  })
+
+  it('scales a data-tel-url tagged element rect into page-coordinate fractions', () => {
+    const slide = document.createElement('div')
+    mockRect(slide, { left: 0, top: 0, width: 1280, height: 720 })
+
+    const tel = document.createElement('a')
+    tel.setAttribute('data-tel-url', 'tel:+12055551234')
+    mockRect(tel, { left: 100, top: 200, width: 96, height: 12 })
+    slide.appendChild(tel)
+
+    const anns = collectLinkAnnotations(slide, 297, 167.0625)
+    expect(anns).toEqual([{
+      x: (100 / 1280) * 297,
+      y: (200 / 720) * 167.0625,
+      w: (96 / 1280) * 297,
+      h: (12 / 720) * 167.0625,
+      url: 'tel:+12055551234',
     }])
   })
 
