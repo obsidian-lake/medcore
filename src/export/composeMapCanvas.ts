@@ -149,7 +149,7 @@ export function composeMapCanvas(
     const meta: LblMeta[] = labels.map(lbl => {
       const p: { x: number; y: number } = map.latLngToContainerPoint(L.latLng(lbl.lat, lbl.lon))
       const isIcon     = lbl.variant === 'icon'
-      const fontSize   = (isIcon ? 10 : 9) * scale
+      const fontSize   = (isIcon ? 13 : 12) * scale
       const fontWeight = isIcon ? '700' : '600'
       const capH       = fontSize * LABEL_BOX.capRatio
       ctx.font = `${fontWeight} ${fontSize}px monospace`

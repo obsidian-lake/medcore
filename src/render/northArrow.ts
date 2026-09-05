@@ -115,7 +115,7 @@ export function drawNorthArrowCanvas(
   ctx.stroke()
 
   // "N" label ABOVE the arrow (north end)
-  const fontSize = 9 * scale
+  const fontSize = 11 * scale
   ctx.font        = `700 ${fontSize}px monospace`
   ctx.fillStyle   = '#ffffff'
   ctx.textAlign   = 'center'
