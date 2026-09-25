@@ -77,9 +77,34 @@ function paceFacilityIds(pace: FacilityPace | null): Set<string> {
 const ESRI_TILES = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 const ESRI_LABELS = 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
 
+// Esri World_Imagery has no real detail past zoom 18 — requesting deeper only serves
+// upsampled server-side tiles, so this is both our ceiling and our detail ceiling.
+const ESRI_MAX_NATIVE_ZOOM = 18
+// Zoom levels deeper than the view's own fit-zoom to fetch tiles from (4x linear tile
+// density). composeMapCanvas draws each native 256px tile into `tileSize * EXPORT_SCALE`
+// destination px — at EXPORT_SCALE 3, tileSize must be ≤ 256/3 to avoid upscaling, so 2
+// levels (tileSize 64) is the minimum that guarantees a downscale.
+const TILE_OVERSAMPLE = 2
+
+/**
+ * Add the two Esri layers (imagery + boundary/place labels) sized to fetch tiles from
+ * `TILE_OVERSAMPLE` zoom levels deeper than the map's CURRENT (already-settled) zoom,
+ * clamped so the request never exceeds Esri's real max native zoom. Must be called
+ * AFTER the view's zoom is final (i.e. after fitBounds/setView) — calling it earlier
+ * would size tiles for the wrong zoom once the view moves.
+ */
+function addEsriLayers(L: any, map: any): void {
+  const n = Math.max(0, Math.min(TILE_OVERSAMPLE, ESRI_MAX_NATIVE_ZOOM - map.getZoom()))
+  const tileSize = 256 / 2 ** n
+  ;(L as any).tileLayer(ESRI_TILES,  { attribution: '', tileSize, zoomOffset: n, crossOrigin: true }).addTo(map)
+  ;(L as any).tileLayer(ESRI_LABELS, { attribution: '', tileSize, zoomOffset: n, crossOrigin: true, opacity: 1 }).addTo(map)
+}
+
 const waitForTiles = (map: any): Promise<void> => new Promise(resolve => {
   const POLL_MS = 150
-  const MAX_MS  = 10_000
+  // Tile oversampling (see addEsriLayers) can mean up to ~16x more tile requests
+  // than a 1:1 grid, so this needs more headroom than a non-oversampled fetch would.
+  const MAX_MS  = 20_000
   let elapsed   = 0
 
   const allTilesComplete = (): boolean => {
@@ -140,6 +165,7 @@ async function renderEchelonInsetCanvas(
     const map = (L as any).map(container, {
       center:              [target.lat, target.lon],
       zoom:                7,
+      maxZoom:             ESRI_MAX_NATIVE_ZOOM,
       zoomControl:         false,
       attributionControl:  false,
       preferCanvas:        true,
@@ -148,9 +174,6 @@ async function renderEchelonInsetCanvas(
       markerZoomAnimation: false,
     })
     map.invalidateSize()
-
-    ;(L as any).tileLayer(ESRI_TILES, { attribution: '', maxZoom: 18, crossOrigin: true }).addTo(map)
-    ;(L as any).tileLayer(ESRI_LABELS, { attribution: '', maxZoom: 18, crossOrigin: true, opacity: 1 }).addTo(map)
 
     const labels: MapLabel[] = []
     const bounds: [number, number][] = [[target.lat, target.lon]]
@@ -284,6 +307,8 @@ async function renderEchelonInsetCanvas(
     if (bounds.length > 1) {
       map.fitBounds((L as any).latLngBounds(bounds).pad(0.14))
     }
+
+    addEsriLayers(L, map)
 
     await waitForTiles(map)
     await new Promise<void>(r => requestAnimationFrame(() => r()))
@@ -445,6 +470,7 @@ export async function renderMedMapToCanvas(
     const map = (L as any).map(container, {
       center:              [target.lat, target.lon],
       zoom:                9,
+      maxZoom:             ESRI_MAX_NATIVE_ZOOM,
       zoomControl:         false,
       attributionControl:  false,
       preferCanvas:        true,
@@ -453,9 +479,6 @@ export async function renderMedMapToCanvas(
       markerZoomAnimation: false,
     })
     map.invalidateSize()
-
-    ;(L as any).tileLayer(ESRI_TILES, { attribution: '', maxZoom: 18, crossOrigin: true }).addTo(map)
-    ;(L as any).tileLayer(ESRI_LABELS, { attribution: '', maxZoom: 18, crossOrigin: true, opacity: 1 }).addTo(map)
 
     const labels: MapLabel[] = []
 
@@ -587,6 +610,9 @@ export async function renderMedMapToCanvas(
     if (bounds.length > 1) {
       map.fitBounds((L as any).latLngBounds(bounds).pad(0.20))
     }
+
+    // Tile layers are sized only once the view's final zoom is known (see addEsriLayers).
+    addEsriLayers(L, map)
 
     log('Imagery: waiting for tiles…')
     await waitForTiles(map)

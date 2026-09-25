@@ -70,6 +70,11 @@ export function composeMapCanvas(
   canvas.width  = W * scale
   canvas.height = H * scale
   const ctx = canvas.getContext('2d')!
+  // Tiles are native 256px raster stretched up to tileSize*scale — the canvas default
+  // resampling ('low' quality in Chromium) looks soft/blotchy at that stretch factor.
+  // 'high' uses a proper bicubic-ish filter.
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
 
   ctx.fillStyle = backgroundColor
   ctx.fillRect(0, 0, W * scale, H * scale)
