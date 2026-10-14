@@ -23,10 +23,12 @@
  */
 
 import { forwardRef } from 'react'
+import type { CSSProperties } from 'react'
 import type { FacilityPace, FacilityPaceEntry, TreatmentPace } from '../med/pace'
 import { paceLetterColor } from '../med/pace'
 import { formatTransit, transitColorHex } from '../med/rank'
 import { careLevelRoman } from '../med/careLevel'
+import type { CareTier } from '../med/careLevel'
 import type { EchelonPlan } from '../med/echelon'
 import { latLonToMgrs } from '../calc/geo'
 import { formatTricareLanguageNote } from '../med/tricareLanguage'
@@ -76,6 +78,18 @@ function toTelHref(phone: string): string {
   return `tel:${digits}`
 }
 
+/** Small "LVL {roman}" pill — used in both the PACE tables and the Echelons of Care block. */
+function LevelBadge({ tier, style }: { tier: CareTier; style?: CSSProperties }) {
+  return (
+    <span style={{
+      display: 'inline-block', fontSize: 9, fontWeight: 700, color: '#0d1a0d', background: '#81c784',
+      borderRadius: 3, padding: '0 4px', letterSpacing: 0.5, verticalAlign: 'middle', ...style,
+    }}>
+      LVL {careLevelRoman(tier)}
+    </span>
+  )
+}
+
 /** Shared facility PACE table rows (reused for both hospital and chamber tables in dive mode). */
 function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable'> }) {
   return (
@@ -87,12 +101,7 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
           <tr key={entry.letter} style={{ borderBottom: '1px solid #1a2a1a' }}>
             <td style={{ padding: '4px 4px', fontWeight: 700, fontSize: 13, color }}>{entry.letter}</td>
             <td style={{ padding: '4px 4px' }}>
-              <span style={{
-                display: 'inline-block', fontSize: 9, fontWeight: 700, color: '#0d1a0d', background: '#81c784',
-                borderRadius: 3, padding: '0 4px', letterSpacing: 0.5,
-              }}>
-                LVL {careLevelRoman(fac.tier)}
-              </span>
+              <LevelBadge tier={fac.tier} />
             </td>
             <td style={{ padding: '4px 4px' }}>
               <span style={{ fontWeight: 700, fontSize: 12, color: '#c8e6c9' }}>{fac.name}</span>
@@ -281,6 +290,8 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
                 <div style={{ marginBottom: 2 }}>
                   <span style={{ color: '#4caf50', fontWeight: 700 }}>L1</span>
                   {' '}POI →[{echelonPlan.legs[0].assetLabel}]→{' '}
+                  <LevelBadge tier={echelonPlan.stabilizeAt.tier} />
+                  {' '}
                   <span style={{ color: '#c8e6c9', fontWeight: 700 }}>{echelonPlan.stabilizeAt.name}</span>
                   {' '}
                   <span style={{ color: echelonPlan.legs[0].transit.effectiveDurationS <= 3600 ? '#4caf50' : '#ffcc02' }}>
@@ -294,6 +305,8 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
                 <div style={{ marginTop: echelonPlan.legs[0].notes?.length ? 2 : 0 }}>
                   <span style={{ color: echelonPlan.environment === 'training' ? '#ff9800' : '#26c6da', fontWeight: 700 }}>L2</span>
                   {' '}{echelonPlan.stabilizeAt.name} →[{echelonPlan.legs[1].assetLabel}]→{' '}
+                  <LevelBadge tier={echelonPlan.definitive.tier} />
+                  {' '}
                   <span style={{ color: '#c8e6c9', fontWeight: 700 }}>{echelonPlan.definitive.name}</span>
                   {' '}
                   <span style={{ color: '#6a9a6a' }}>
