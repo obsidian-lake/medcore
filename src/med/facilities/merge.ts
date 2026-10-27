@@ -431,6 +431,12 @@ export function mergeFacilities(
   return [...customs, ...result]
 }
 
+/** Override values a medic has manually applied to a fetched facility. */
+export type FacilityOverride = Partial<Pick<
+  FacilityRecord,
+  'name' | 'phone' | 'address' | 'beds' | 'hasHelipad' | 'tier' | 'capabilities' | 'notes' | 'excludeFromPace'
+>>
+
 /**
  * Apply medic overrides to a facility.
  * Returns a new record with override fields patched in.

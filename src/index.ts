@@ -19,8 +19,9 @@ export {
 } from './med/careLevel'
 
 // ── Facilities ────────────────────────────────────────────────────────────────
-export type { FacilityRecord } from './med/facilities/merge'
+export type { FacilityRecord, FacilityOverride } from './med/facilities/merge'
 export { mergeFacilities, applyOverrides } from './med/facilities/merge'
+export type { CustomFacility } from './types/customFacility'
 export { fetchOverpass } from './med/facilities/overpass'
 export { fetchHifld, isConus } from './med/facilities/hifld'
 export type { HifldFacility } from './med/facilities/hifld'
@@ -45,11 +46,25 @@ export { buildFacilityPace, buildTreatmentPace, paceLetterColor } from './med/pa
 export type { EchelonNodes, EchelonPlan } from './med/echelon'
 export { selectEchelonNodes, buildEchelonPlan, pickNearestLevelI, LEG2_DROP_GROUND_DIST_M, LEG2_FIXED_WING_DIST_M } from './med/echelon'
 
+// ── Med workspace widgets (shared MapScreen/TargetScreen/PaceScreen/
+// FacilitiesScreen UI, mission-planner expansion plan, Phase 6a) ────────────
+export type { MedWorkspaceState, MedWorkspacePatch } from './med/workspaceState'
+export { MedMissionParamsCard } from './widgets/MedMissionParamsCard'
+export { MedPacePreview } from './widgets/MedPacePreview'
+export { MedFacilityList } from './widgets/MedFacilityList'
+export { MedMap } from './widgets/MedMap'
+export { directionsUrl } from './util/mapsLink'
+
 // ── Emergency numbers ─────────────────────────────────────────────────────────
 export { getEmergencyNumbers, formatEmergencyNumber } from './med/emergencyNumbers'
 
 // ── TRICARE language ──────────────────────────────────────────────────────────
 export { formatTricareLanguageNote } from './med/tricareLanguage'
+
+// ── Map rendering (Leaflet) ───────────────────────────────────────────────────
+export { addNorthArrow, drawNorthArrowCanvas } from './render/northArrow'
+export type { PlacementItem, Obstacle, Placement } from './render/labelPlacement'
+export { placeLabels } from './render/labelPlacement'
 
 // ── Map compositor ────────────────────────────────────────────────────────────
 export type { MapLabel } from './types/mapLabel'

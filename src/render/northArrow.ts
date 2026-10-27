@@ -114,7 +114,11 @@ export function drawNorthArrowCanvas(
   ctx.lineWidth = 1.5 * scale
   ctx.stroke()
 
-  // "N" label ABOVE the arrow (north end)
+  // "N" label ABOVE the arrow (north end) — 11px (not MFFJM's local 9px
+  // Leaflet-control copy, which has no canvas-export variant at all): a
+  // deliberate bump for export legibility (see "Increase font size of map
+  // imagery labels for export legibility"), not drift. Do not shrink this
+  // back down without also checking composeMapCanvas.ts's matching bump.
   const fontSize = 11 * scale
   ctx.font        = `700 ${fontSize}px monospace`
   ctx.fillStyle   = '#ffffff'
