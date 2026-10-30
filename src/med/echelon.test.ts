@@ -253,16 +253,42 @@ describe('buildEchelonPlan', () => {
     expect(leg2.transit.heloDurationS).toBe(4800)
   })
 
-  test('training Leg-2 uses civilian handoff asset label; note on Leg-1, not Leg-2', () => {
+  test('training Leg-2 flies via EMS air ambulance when both facilities have a helipad', () => {
+    // leg2Transit = mkTransit(5400, 6000, 4800): helo transit (4800s) is available and
+    // both stabilizeHosp/definitiveHosp have helipads, so Leg-2 should fly, not drive —
+    // the map/imagery label must show flight time (heloDurationS), not groundDurationS.
     const plan = buildEchelonPlan({ nodes, leg2Transit, environment: 'training', organicAssetLabel: 'UH-60', transferAssetLabel: 'HH-60' })
     const leg1 = plan.legs[0]
     const leg2 = plan.legs[1]
-    expect(leg2.assetLabel).toBe('Civilian EMS / hospital transfer')
+    expect(leg2.mode).toBe('rotary')
+    expect(leg2.assetLabel).toBe('Civilian EMS air ambulance')
     // "Team cedes control" moves to Leg-1 in training
     expect(leg1.notes).toBeDefined()
     expect(leg1.notes?.some(n => n.includes('cedes control'))).toBe(true)
     // Leg-2 has no notes in training (civilian handoff — team has already ceded)
     expect(leg2.notes).toBeUndefined()
+  })
+
+  test('training Leg-2 falls back to ground ambulance when an endpoint lacks a helipad', () => {
+    const noHelipadStab = mkFacility({ tier: 2, name: 'No Pad Hospital', hasHelipad: false })
+    const noHelipadNodes: EchelonNodes = {
+      ...nodes,
+      stabilizeAt:      noHelipadStab,
+      stabilizeTransit: mkTransit(600, 600, null),
+    }
+    const plan = buildEchelonPlan({ nodes: noHelipadNodes, leg2Transit, environment: 'training', organicAssetLabel: 'UH-60', transferAssetLabel: 'HH-60' })
+    const leg2 = plan.legs[1]
+    expect(leg2.mode).toBe('ground')
+    expect(leg2.assetLabel).toBe('Civilian EMS / hospital transfer')
+    expect(leg2.notes).toBeUndefined()
+  })
+
+  test('training Leg-2 falls back to ground ambulance when no helo transit was computed, even with helipads at both ends', () => {
+    const noHeloTransit: TransitInfo = { ...leg2Transit, heloDurationS: null }
+    const plan = buildEchelonPlan({ nodes, leg2Transit: noHeloTransit, environment: 'training', organicAssetLabel: 'UH-60', transferAssetLabel: 'HH-60' })
+    const leg2 = plan.legs[1]
+    expect(leg2.mode).toBe('ground')
+    expect(leg2.assetLabel).toBe('Civilian EMS / hospital transfer')
   })
 
   test('operational Leg-2 uses transfer asset label', () => {

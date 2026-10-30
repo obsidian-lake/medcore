@@ -23,7 +23,9 @@
  *
  * Special cases:
  *  - Operational + SOST present: SOST supersedes PACE Primary as stabilize node.
- *  - Training Leg 2: rendered as "Civilian EMS / hospital transfer" handoff.
+ *  - Training Leg 2: rendered as a civilian EMS handoff — air ambulance (rotary)
+ *    when both endpoints have a helipad and a helo transit was computed,
+ *    otherwise ground ambulance ("Civilian EMS / hospital transfer").
  *  - Transfer air leg requires helipads at both endpoints; falls back to ground.
  *
  * This module is pure — no side effects. Keep it unit-testable.
@@ -223,12 +225,16 @@ export function buildEchelonPlan(opts: BuildEchelonPlanOpts): EchelonPlan {
 
   if (environment === 'training') {
     // Training: civilian EMS handoff; team has already ceded control at Leg-1 endpoint.
+    // Default is EMS air ambulance (rotary) when both endpoints have a helipad and a
+    // helo transit was computed — mirrors the operational canFly gate below, so mode
+    // tracks actual flyability instead of being hardcoded to ground.
+    const canFly = nodes.stabilizeAt.hasHelipad && nodes.definitive.hasHelipad && leg2Transit.heloDurationS !== null
     leg2 = {
       role: 'stabilize-to-definitive',
       from: { kind: 'facility', facility: nodes.stabilizeAt, label: nodes.stabilizeAt.name },
       to:   nodes.definitive,
-      mode: 'ground',
-      assetLabel: 'Civilian EMS / hospital transfer',
+      mode: canFly ? 'rotary' : 'ground',
+      assetLabel: canFly ? 'Civilian EMS air ambulance' : 'Civilian EMS / hospital transfer',
       transit: leg2Transit,
     }
   } else {
