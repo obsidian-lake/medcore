@@ -230,6 +230,21 @@ describe('buildEchelonPlan', () => {
     expect(leg1.transit.effectiveDurationS).toBe(600)
   })
 
+  test('Leg-1 falls back to ground label when no rotary asset is available, even with a helipad at the stabilize facility', () => {
+    // stabilizeAt has a helipad, but the caller nulled heloDurationS because no
+    // organic rotary asset is available — the airframe label must not leak
+    // onto a leg whose mode has fallen back to ground.
+    const noAssetNodes: EchelonNodes = {
+      ...nodes,
+      stabilizeTransit: mkTransit(600, 600, null),
+    }
+    const plan = buildEchelonPlan({ nodes: noAssetNodes, leg2Transit, environment: 'operational', organicAssetLabel: 'CV-22 / MV-22 Osprey', transferAssetLabel: 'CV-22 / MV-22 Osprey' })
+    const leg1 = plan.legs[0]
+    expect(leg1.mode).toBe('ground')
+    expect(leg1.assetLabel).toBe('Ground evacuation')
+    expect(leg1.assetLabel).not.toContain('CV-22')
+  })
+
   test('Leg-2 transit equals the passed inter-facility value', () => {
     const plan = buildEchelonPlan({ nodes, leg2Transit, environment: 'operational', organicAssetLabel: 'UH-60', transferAssetLabel: 'HH-60' })
     const leg2 = plan.legs[1]
@@ -350,7 +365,7 @@ describe('formatEchelonSummary', () => {
     const stabilizeHosp  = mkFacility({ tier: 2, name: 'District Hospital', hasHelipad: true })
     const nodes: EchelonNodes = {
       stabilizeAt:       stabilizeHosp,
-      stabilizeTransit:  mkTransit(600),
+      stabilizeTransit:  mkTransit(600, 600, 480),
       definitive:        definitiveHosp,
       definitiveTransit: mkTransit(9000),
       stabilizeIsSost:   false,

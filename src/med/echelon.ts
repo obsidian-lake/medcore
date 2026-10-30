@@ -203,12 +203,16 @@ export function buildEchelonPlan(opts: BuildEchelonPlanOpts): EchelonPlan {
     nodes.stabilizeAt.hasHelipad && nodes.stabilizeTransit.heloDurationS !== null
       ? 'rotary' : 'ground'
 
+  // Label must follow the resolved mode, not just the configured airframe — when
+  // leg1Mode fell back to ground (no helipad, or no helo transit computed because
+  // no organic asset is available), the airframe label (e.g. "CV-22 / MV-22 Osprey")
+  // must not be shown for a ground leg.
   const leg1: EchelonLeg = {
     role: 'evac-to-stabilize',
     from: { kind: 'poi', label: 'POI' },
     to:   nodes.stabilizeAt,
     mode: leg1Mode,
-    assetLabel: organicAssetLabel || 'Organic lift',
+    assetLabel: leg1Mode === 'rotary' ? (organicAssetLabel || 'Organic lift') : 'Ground evacuation',
     transit: nodes.stabilizeTransit,
     // Team cedes control at the stabilize node — note lives here (Leg-1 endpoint).
     notes: environment === 'training' ? ['Team cedes control at stabilizing facility'] : undefined,

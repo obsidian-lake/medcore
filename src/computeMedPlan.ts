@@ -233,10 +233,14 @@ export async function computeMedPlan(
     : null
 
   // 11. Echelon plan
+  // Gate the label on rotaryWingAvailable first — rotaryWingType/transferAssetType
+  // keep their configured airframe id even when the toggle is off, so looking the
+  // id up in AIRFRAMES unconditionally would leak the airframe name (e.g. "CV-22")
+  // onto a leg that has actually fallen back to ground.
   const organicAf = AIRFRAMES.find(a => a.id === input.rotaryWingType)
-  const organicAssetLabel = organicAf ? organicAf.label : (input.rotaryWingAvailable ? 'Organic lift' : '')
+  const organicAssetLabel = !input.rotaryWingAvailable ? '' : organicAf ? organicAf.label : 'Organic lift'
   const transferAf = AIRFRAMES.find(a => a.id === input.transferAssetType)
-  const transferAssetLabel = transferAf ? transferAf.label : organicAssetLabel
+  const transferAssetLabel = !input.rotaryWingAvailable ? '' : transferAf ? transferAf.label : organicAssetLabel
 
   const nearestFacilityName = facilityPace.entries.find(e => e.letter === 'P')?.facility.name
   const treatmentPace = buildTreatmentPace({
