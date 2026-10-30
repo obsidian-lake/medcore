@@ -78,6 +78,16 @@ function toTelHref(phone: string): string {
   return `tel:${digits}`
 }
 
+// The facility-name column in the (tighter) non-dive PACE table is ~340px at fontSize 9
+// Courier New (~5.4px/char) — this caps the address+notes line a bit under that so it
+// never needs to wrap, since row height isn't otherwise bounded and an unbounded line
+// here both overflows this section into the one below it and (once that's blocked) gets
+// clipped anyway. whiteSpace:nowrap + textOverflow:ellipsis below are a second guard.
+const INFO_LINE_MAX_CHARS = 56
+function truncateInfoLine(s: string): string {
+  return s.length > INFO_LINE_MAX_CHARS ? s.slice(0, INFO_LINE_MAX_CHARS - 1) + '…' : s
+}
+
 /** Small "LVL {roman}" pill — used in both the PACE tables and the Echelons of Care block. */
 function LevelBadge({ tier, style }: { tier: CareTier; style?: CSSProperties }) {
   return (
@@ -122,15 +132,16 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                   Ph: {fac.phone}
                 </a>
               )}
-              {/* Notes share the address's line rather than adding their own — table row
-                  height isn't capped here, so an unconditional extra line pushed rows tall
-                  enough to overflow this section into the one below it (Treatment PACE). */}
+              {/* Notes share the address's line rather than adding their own, and the
+                  combined line is forced to a single row (see INFO_LINE_MAX_CHARS above) —
+                  letting it wrap grows row height unpredictably, which either overflows
+                  this section into Treatment PACE below it or gets silently clipped. */}
               {(fac.address || fac.notes) && (
                 <div
                   data-maps-url={fac.address ? `https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}` : undefined}
-                  style={{ fontSize: 9, color: '#6a9a6a', overflowWrap: 'break-word' }}
+                  style={{ fontSize: 9, color: '#6a9a6a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                 >
-                  {[fac.address?.slice(0, 50), fac.notes?.slice(0, 60)].filter(Boolean).join(' — ')}
+                  {truncateInfoLine([fac.address, fac.notes].filter(Boolean).join(' — '))}
                 </div>
               )}
             </td>
