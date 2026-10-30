@@ -231,7 +231,10 @@ export function buildEchelonPlan(opts: BuildEchelonPlanOpts): EchelonPlan {
     // Operational: determine mode and notes from the transit flags set by App.tsx.
     // fixedWingDurationS is set when Leg-2 geodesic distance ≥ LEG2_FIXED_WING_DIST_M.
     // groundDurationS is null when distance ≥ LEG2_DROP_GROUND_DIST_M (route not fetched).
-    const canFly = nodes.stabilizeAt.hasHelipad && nodes.definitive.hasHelipad
+    // heloDurationS is null whenever the caller has no rotary asset to offer (no
+    // organic asset available), mirroring how leg1Mode is gated above — canFly
+    // must not re-derive availability from hasHelipad alone.
+    const canFly = nodes.stabilizeAt.hasHelipad && nodes.definitive.hasHelipad && leg2Transit.heloDurationS !== null
     const hasFW  = leg2Transit.fixedWingDurationS != null
     const hasGnd = leg2Transit.groundDurationS != null
 
@@ -240,19 +243,27 @@ export function buildEchelonPlan(opts: BuildEchelonPlanOpts): EchelonPlan {
       canFly ? 'rotary' : hasFW ? 'fixed-wing' : 'ground'
 
     const assetLabel =
-      mode === 'fixed-wing'
-        ? 'C-130 (fixed-wing)'
-        : transferAssetLabel || organicAssetLabel || 'Transfer asset'
+      mode === 'fixed-wing' ? 'C-130 (fixed-wing)'
+      : mode === 'ground'   ? 'Ground MEDEVAC transfer'
+      : transferAssetLabel || organicAssetLabel || 'Transfer asset'
+
+    // Distinguish "no helipad" from "no rotary asset available" so the note
+    // doesn't blame a missing helipad when both endpoints actually have one.
+    const noHelipad = !(nodes.stabilizeAt.hasHelipad && nodes.definitive.hasHelipad)
 
     const notes: string[] = []
     if (hasFW) {
       notes.push('Airfield must be located and coordinated for fixed-wing (C-130) transport')
     }
     if (!canFly && !hasFW && hasGnd) {
-      notes.push('No helipad at one endpoint — ground transfer')
+      notes.push(noHelipad
+        ? 'No helipad at one endpoint — ground transfer'
+        : 'No rotary-wing asset available — ground transfer')
     }
     if (!canFly && !hasFW && !hasGnd) {
-      notes.push('Long-haul transfer — no organic rotary or ground option; coordinate dedicated air asset')
+      notes.push(noHelipad
+        ? 'Long-haul transfer — no organic rotary or ground option; coordinate dedicated air asset'
+        : 'Long-haul transfer — no rotary asset available and no ground option; coordinate dedicated air asset')
     }
 
     leg2 = {

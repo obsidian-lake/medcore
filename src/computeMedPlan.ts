@@ -273,7 +273,7 @@ export async function computeMedPlan(
     const showFixedWing = isOp && leg2DistM >= LEG2_FIXED_WING_DIST_M
 
     let leg2HeloS: number | null = null
-    if (echelonNodes.stabilizeAt.hasHelipad && echelonNodes.definitive.hasHelipad) {
+    if (input.rotaryWingAvailable && echelonNodes.stabilizeAt.hasHelipad && echelonNodes.definitive.hasHelipad) {
       leg2HeloS = heloTransitS(stabCoord, defCoord, transferSpeed)
     }
     const leg2FixedWingS = showFixedWing ? heloTransitS(stabCoord, defCoord, FIXED_WING_SPEED_KT) : null

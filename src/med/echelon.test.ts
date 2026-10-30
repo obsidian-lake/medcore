@@ -272,6 +272,19 @@ describe('buildEchelonPlan', () => {
     expect(leg2.notes?.some(n => n.includes('No helipad'))).toBe(true)
   })
 
+  test('operational Leg-2 falls back to ground when no rotary asset is available, even with helipads at both ends', () => {
+    // Both endpoints have helipads, but the caller nulled heloDurationS because
+    // no organic/transfer rotary asset is available — canFly must not be
+    // re-derived from hasHelipad alone.
+    const noAssetTransit: TransitInfo = { ...leg2Transit, heloDurationS: null, groundDurationS: 6000 }
+    const plan = buildEchelonPlan({ nodes, leg2Transit: noAssetTransit, environment: 'operational', organicAssetLabel: 'UH-60', transferAssetLabel: 'CV-22 / MV-22 Osprey' })
+    const leg2 = plan.legs[1]
+    expect(leg2.mode).toBe('ground')
+    expect(leg2.assetLabel).toBe('Ground MEDEVAC transfer')
+    expect(leg2.notes?.some(n => n.includes('No rotary-wing asset available'))).toBe(true)
+    expect(leg2.notes?.some(n => n.includes('No helipad'))).toBe(false)
+  })
+
   test('plan records stabilizeAt and definitive from nodes', () => {
     const plan = buildEchelonPlan({ nodes, leg2Transit, environment: 'operational', organicAssetLabel: 'UH-60', transferAssetLabel: 'HH-60' })
     expect(plan.stabilizeAt.name).toBe('District Hospital')
@@ -344,7 +357,7 @@ describe('formatEchelonSummary', () => {
     }
     const plan = buildEchelonPlan({
       nodes,
-      leg2Transit:        mkTransit(5400),
+      leg2Transit:        mkTransit(5400, 5400, 5400),
       environment:        'operational',
       organicAssetLabel:  'UH-60',
       transferAssetLabel: 'HH-60',
