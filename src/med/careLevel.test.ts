@@ -14,6 +14,10 @@ import {
   inferCapsFromName,
   inferCapsFromTraumaLevel,
   inferCapsFromClassifiedTier,
+  NTC_TIER,
+  isNonTraumaCenter,
+  isOpen24x7,
+  edIs24x7,
 } from './careLevel'
 
 describe('usTraumaLevelToTier', () => {
@@ -105,20 +109,20 @@ describe('osmHeuristicTier', () => {
     })).toBe(2)
   })
 
-  test('No ER → tier 1 (Level IV)', () => {
+  test('No ER → tier 0 (NTC)', () => {
     expect(osmHeuristicTier({
       hasEmergency: false,
       specialities: ['general'],
       beds: 200,
-    })).toBe(1)
+    })).toBe(0)
   })
 
-  test('No ER, no specialities → tier 1 (Level IV)', () => {
+  test('No ER, no specialities → tier 0 (NTC)', () => {
     expect(osmHeuristicTier({
       hasEmergency: false,
       specialities: [],
       beds: 0,
-    })).toBe(1)
+    })).toBe(0)
   })
 })
 
@@ -127,6 +131,7 @@ describe('careLevelLabel', () => {
   test('tier 3 → Level II', () => expect(careLevelLabel(3)).toBe('Level II — Major'))
   test('tier 2 → Level III', () => expect(careLevelLabel(2)).toBe('Level III — Intermediate'))
   test('tier 1 → Level IV', () => expect(careLevelLabel(1)).toBe('Level IV — Basic'))
+  test('tier 0 → NTC', () => expect(careLevelLabel(0)).toBe('NTC — Non-Trauma Center'))
 })
 
 describe('careLevelRoman', () => {
@@ -134,6 +139,41 @@ describe('careLevelRoman', () => {
   test('tier 3 → II', () => expect(careLevelRoman(3)).toBe('II'))
   test('tier 2 → III', () => expect(careLevelRoman(2)).toBe('III'))
   test('tier 1 → IV', () => expect(careLevelRoman(1)).toBe('IV'))
+  test('tier 0 → NTC', () => expect(careLevelRoman(0)).toBe('NTC'))
+})
+
+describe('isNonTraumaCenter / NTC_TIER', () => {
+  test('tier 0 is NTC', () => expect(isNonTraumaCenter(0)).toBe(true))
+  test('tier 1 is not NTC', () => expect(isNonTraumaCenter(1)).toBe(false))
+  test('tier 4 is not NTC', () => expect(isNonTraumaCenter(4)).toBe(false))
+  test('NTC_TIER is 0', () => expect(NTC_TIER).toBe(0))
+})
+
+describe('isOpen24x7', () => {
+  test('"24/7" → true', () => expect(isOpen24x7('24/7')).toBe(true))
+  test('"Mo-Su 00:00-24:00" → true', () => expect(isOpen24x7('Mo-Su 00:00-24:00')).toBe(true))
+  test('"00:00-24:00" → true', () => expect(isOpen24x7('00:00-24:00')).toBe(true))
+  test('"Mo-Su 00:00-23:59" → true', () => expect(isOpen24x7('Mo-Su 00:00-23:59')).toBe(true))
+  test('case/whitespace insensitive', () => expect(isOpen24x7('  24/7  ')).toBe(true))
+  test('"Mo-Fr 08:00-17:00" → false', () => expect(isOpen24x7('Mo-Fr 08:00-17:00')).toBe(false))
+  test('"Mo-Su 08:00-20:00" → false', () => expect(isOpen24x7('Mo-Su 08:00-20:00')).toBe(false))
+  test('empty string → false', () => expect(isOpen24x7('')).toBe(false))
+  test('"by appointment" → false', () => expect(isOpen24x7('by appointment')).toBe(false))
+})
+
+describe('edIs24x7', () => {
+  test('opening_hours:emergency 24/7 → true', () =>
+    expect(edIs24x7({ openingHoursEmergency: '24/7' })).toBe(true))
+  test('opening_hours:emergency restricted → false', () =>
+    expect(edIs24x7({ openingHoursEmergency: 'Mo-Fr 08:00-17:00' })).toBe(false))
+  test('ED tag wins over conflicting general hours', () =>
+    expect(edIs24x7({ openingHoursEmergency: '24/7', openingHours: 'Mo-Fr 09:00-17:00' })).toBe(true))
+  test('falls back to opening_hours when no ED-specific tag', () =>
+    expect(edIs24x7({ openingHours: 'Mo-Fr 09:00-17:00' })).toBe(false))
+  test('opening_hours 24/7 fallback → true', () =>
+    expect(edIs24x7({ openingHours: '24/7' })).toBe(true))
+  test('no hours tags at all → assumed 24/7', () =>
+    expect(edIs24x7({})).toBe(true))
 })
 
 describe('isPediatricOnly', () => {

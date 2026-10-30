@@ -376,3 +376,89 @@ describe('buildFacilityPace — dive mode (requiredCapability: hyperbaric)', () 
   })
 
 })
+
+// ── NTC (Non-Trauma Center, tier 0) ───────────────────────────────────────────
+
+describe('buildFacilityPace — NTC exclusion', () => {
+
+  test('NTC facility never fills any trauma PACE slot (P/A/C/E), however close', () => {
+    const ntc   = mkFacility({ id: 'ntc', name: 'Urgent Care (no 24/7 ED)', tier: 0 })
+    const basic = mkFacility({ id: 'b',   name: 'Rural Level IV',          tier: 1 })
+
+    const ranked: FacilityScore[] = [
+      mkScore(ntc, 60, 400),      // essentially next door — would win on distance alone
+      mkScore(basic, 3000, 100),  // far away but trauma-capable
+    ]
+
+    const { entries } = buildFacilityPace({
+      ranked,
+      allFacilities: [ntc, basic],
+    })
+
+    const allIds = entries.map(e => e.facility.id)
+    expect(allIds).not.toContain('ntc')
+    expect(allIds.every(id => id === 'b')).toBe(true)
+  })
+
+  test('warning emitted when only NTC facilities are in range', () => {
+    const ntc1 = mkFacility({ id: 'n1', name: 'Clinic A (no 24/7 ED)', tier: 0 })
+    const ntc2 = mkFacility({ id: 'n2', name: 'Clinic B (no 24/7 ED)', tier: 0 })
+
+    const ranked: FacilityScore[] = [
+      mkScore(ntc1, 300, 200),
+      mkScore(ntc2, 600, 150),
+    ]
+
+    const { entries, warnings } = buildFacilityPace({
+      ranked,
+      allFacilities: [ntc1, ntc2],
+    })
+
+    expect(entries).toHaveLength(0)
+    expect(warnings.some(w => /NTC/.test(w))).toBe(true)
+  })
+
+  test('medic override can still place an NTC facility into a PACE slot', () => {
+    const ntc   = mkFacility({ id: 'ntc', name: 'Local Clinic', tier: 0 })
+    const basic = mkFacility({ id: 'b',   name: 'Rural Level IV', tier: 1 })
+
+    const ranked: FacilityScore[] = [
+      mkScore(ntc, 300, 300),
+      mkScore(basic, 600, 200),
+    ]
+
+    const { entries } = buildFacilityPace({
+      ranked,
+      allFacilities: [ntc, basic],
+      overrides: { C: 'ntc' },
+    })
+
+    const cEntry = entries.find(e => e.letter === 'C')!
+    expect(cEntry.facility.id).toBe('ntc')
+    expect(cEntry.overridden).toBe(true)
+  })
+
+  test('capability mode (chambers) is unaffected by NTC exclusion', () => {
+    // Chamber records are tier 2 by convention (fromChamber), but exercise the
+    // boundary explicitly: an NTC-tiered facility carrying the required capability
+    // should still be usable in poolMode:'capability' (dive mode), which is how
+    // App.tsx actually invokes buildFacilityPace for chamber PACE.
+    const chamberFac = mkFacility({
+      id: 'hbo', name: 'HBO Center', tier: 0,
+      capabilities: ['hyperbaric'] as CapabilityFlag[], hasHelipad: false,
+    })
+
+    const ranked: FacilityScore[] = [mkScore(chamberFac, 600, 300)]
+
+    const { entries } = buildFacilityPace({
+      ranked,
+      allFacilities: [chamberFac],
+      requiredCapability: 'hyperbaric',
+      poolMode: 'capability',
+    })
+
+    const allIds = entries.map(e => e.facility.id)
+    expect(allIds).toContain('hbo')
+  })
+
+})

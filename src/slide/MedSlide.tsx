@@ -78,14 +78,21 @@ function toTelHref(phone: string): string {
   return `tel:${digits}`
 }
 
-/** Small "LVL {roman}" pill — used in both the PACE tables and the Echelons of Care block. */
+/**
+ * Small "LVL {roman}" pill — used in both the PACE tables and the Echelons of Care block.
+ * NTC (tier 0) can only reach here via a medic override (it's excluded from the pool
+ * otherwise); rendered without the "LVL" prefix and in the muted excluded-facility grey
+ * so it still reads as a deliberate exception rather than a normal trauma level.
+ */
 function LevelBadge({ tier, style }: { tier: CareTier; style?: CSSProperties }) {
+  const isNtc = tier === 0
   return (
     <span style={{
-      display: 'inline-block', fontSize: 9, fontWeight: 700, color: '#0d1a0d', background: '#81c784',
+      display: 'inline-block', fontSize: 9, fontWeight: 700,
+      color: isNtc ? '#e0e0e0' : '#0d1a0d', background: isNtc ? '#616161' : '#81c784',
       borderRadius: 3, padding: '0 4px', letterSpacing: 0.5, verticalAlign: 'middle', ...style,
     }}>
-      LVL {careLevelRoman(tier)}
+      {isNtc ? careLevelRoman(tier) : `LVL ${careLevelRoman(tier)}`}
     </span>
   )
 }

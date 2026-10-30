@@ -41,6 +41,7 @@
 import type { FacilityScore, TransitInfo } from './rank'
 import type { FacilityRecord } from './facilities/merge'
 import type { CapabilityFlag } from './careLevel'
+import { isNonTraumaCenter } from './careLevel'
 import { formatTransit } from './rank'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -194,13 +195,19 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
   // Medic overrides can still force-assign any facility (see override path below).
   const sorted = poolMode === 'trauma' ? [...ranked].sort(doctrineCompare) : ranked
 
-  const pool = sorted.filter(s =>
+  const preNtcFilter = (s: FacilityScore) =>
     !s.facility.pediatricOnly &&
     !s.facility.excludeFromPace &&
     (!requiredCapability || s.facility.capabilities.includes(requiredCapability)) &&
     (poolMode !== 'trauma' || !s.facility.isChamber) &&
     // Trauma mode: exclude Level I beyond golden hour (Echelons of Care plan handles them).
     (poolMode !== 'trauma' || (s.facility.tier as number) < 4 || s.transit.effectiveDurationS <= GOLDEN_HOUR_S)
+
+  const pool = sorted.filter(s =>
+    preNtcFilter(s) &&
+    // Trauma mode: NTC facilities (no 24/7 ED) are never PACE-eligible, regardless
+    // of distance. Capability mode (chambers) is untiered, so NTC is irrelevant there.
+    (poolMode !== 'trauma' || !isNonTraumaCenter(s.facility.tier))
   )
 
   // Warn when a capability constraint excludes everything (dive mode, chamber PACE).
@@ -208,6 +215,15 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
     warnings.push(
       `Dive mode: no recompression/hyperbaric chamber found within the search radius. ` +
       `Expand the search radius, or add the "hyperbaric" capability to a known chamber facility on the Facilities tab.`
+    )
+  }
+
+  // Warn when the only reason the pool is empty is that every in-range candidate
+  // is a Non-Trauma Center (no 24/7 ED) — distinct from "nothing nearby at all".
+  if (poolMode === 'trauma' && pool.length === 0 && sorted.some(preNtcFilter)) {
+    warnings.push(
+      `No trauma-capable facilities in range — only Non-Trauma Center (NTC) hospitals found. ` +
+      `Expand the search radius, or override a PACE slot with an NTC facility manually.`
     )
   }
 

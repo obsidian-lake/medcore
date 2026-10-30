@@ -16,6 +16,7 @@ export {
   usTraumaLevelToTier, ukClassificationToTier, osmHeuristicTier,
   isPediatricOnly, inferCapsFromName, inferCapsFromClassifiedTier,
   inferCapsFromTraumaLevel, hifldServiceLinesToCaps, osmSpecialitiesToCaps,
+  NTC_TIER, isNonTraumaCenter, isOpen24x7, edIs24x7,
 } from './med/careLevel'
 
 // ── Facilities ────────────────────────────────────────────────────────────────

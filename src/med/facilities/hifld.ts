@@ -59,7 +59,7 @@ export function isConus(ll: LatLon): boolean {
     ll.lon >= CONUS_BBOX.minLon && ll.lon <= CONUS_BBOX.maxLon
 }
 
-const CACHE_KEY_PREFIX = 'medplanner-hifld-'
+const CACHE_KEY_PREFIX = 'medplanner-hifld-v2-'
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000   // 30 days
 
 // HIFLD public Feature Service URL (GeoJSON output format)
@@ -129,7 +129,10 @@ function parseHifldFeature(feat: { attributes: HifldAttr; geometry: { x: number;
   if (traumaLevel !== null) {
     tier = usTraumaLevelToTier(traumaLevel)
   } else {
-    // Fallback heuristic when no trauma designation
+    // Fallback heuristic when no trauma designation. HIFLD carries no hours
+    // field, so hasEmergency (EMERGENCY=Y) is the only signal — a hospital
+    // with EMERGENCY !== 'Y' lands at tier 0 (NTC), same as an OSM hospital
+    // with no emergency=yes tag.
     tier = osmHeuristicTier({
       hasEmergency,
       specialities: (a.TYPE ?? '').split(',').map(s => s.trim()),

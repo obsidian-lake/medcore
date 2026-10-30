@@ -35,7 +35,7 @@ import { addNorthArrow } from '../render/northArrow'
 import { latLonToMgrs, inverse } from '../calc/geo'
 import type { PaceLetter, FacilityPace } from '../med/pace'
 import { formatTransit } from '../med/rank'
-import { careLevelRoman } from '../med/careLevel'
+import { careLevelRoman, type CareTier } from '../med/careLevel'
 import { placeLabels } from '../render/labelPlacement'
 import type { MedWorkspaceState, MedWorkspacePatch } from '../med/workspaceState'
 
@@ -79,9 +79,9 @@ function paceLetterTextColor(letter: PaceLetter): string {
   }
 }
 
-/** CSS tier badge character for divIcon — uses canonical Level roman numeral. */
+/** CSS tier badge character for divIcon — uses canonical Level roman numeral (or "NTC"). */
 function tierBadge(tier: number): string {
-  return careLevelRoman(tier as 1 | 2 | 3 | 4)
+  return careLevelRoman(tier as CareTier)
 }
 
 // Returns the PACE letter entry for a facility, or null if not in the plan
@@ -432,10 +432,11 @@ export function MedMap({ state, onPatch, groundRoutes, isochrone60, onFetch }: P
           : isPace && paceEntry ? paceLetterTextColor(paceEntry.letter) : tierTextColor(fac.tier)
 
         const shortName = fac.name.length > 20 ? fac.name.slice(0, 18) + '…' : fac.name
+        const badgeSuffix = badge === 'NTC' ? badge : `L${badge}`
         const labelText = isChamberPrimary
           ? (compactLabels ? 'P' : `[P] ${shortName} CHMBR`)
           : (isPace && paceEntry)
-            ? (compactLabels ? paceEntry.letter : `[${paceEntry.letter}] ${shortName} L${badge}`)
+            ? (compactLabels ? paceEntry.letter : `[${paceEntry.letter}] ${shortName} ${badgeSuffix}`)
             : `Lvl ${badge}`
         // Treat chamber primary same as PACE for sizing
         const isHighlighted = isPace || isChamberPrimary

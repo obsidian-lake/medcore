@@ -23,7 +23,7 @@
 
 import type { FacilityRecord } from './facilities/merge'
 import type { CareTier, CapabilityFlag } from './careLevel'
-import { careLevelLabel } from './careLevel'
+import { careLevelLabel, isNonTraumaCenter } from './careLevel'
 
 export interface TransitInfo {
   groundDurationS:    number | null   // null = not computed / unavailable
@@ -166,9 +166,11 @@ function shouldPhasePlan(
   // If definitive care is within golden hour, go directly — no staging needed
   if (closestDefinitive.transit.effectiveDurationS <= PHASE_MIN_TRANSIT_S) return undefined
 
-  // Among lower-tier capable facilities, find the nearest (stabilization candidate)
+  // Among lower-tier capable facilities, find the nearest (stabilization candidate).
+  // Excludes NTC (no 24/7 ED) — a stabilize leg must land at a trauma-capable facility.
   const lowerTierOptions = capable.filter(s =>
-    (s.facility.tier as number) < highestTier
+    (s.facility.tier as number) < highestTier &&
+    !isNonTraumaCenter(s.facility.tier)
   )
   if (lowerTierOptions.length === 0) return undefined
 

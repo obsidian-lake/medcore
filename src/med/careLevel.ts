@@ -2,20 +2,26 @@
  * Care-level normalization.
  *
  * All facility sources (US trauma levels, UK MTCs, OSM heuristics, custom)
- * are normalized into a single internal tier 1–4 so the ranking algorithm
+ * are normalized into a single internal tier 0–4 so the ranking algorithm
  * operates on a comparable scale regardless of source.
  *
  * Internal tier (ascending capability):
  *   4 — Level I  (US Level I / UK MTC / highest definitive care)
  *   3 — Level II (US Level II / UK Trauma Unit high)
  *   2 — Level III (US Level III / UK Trauma Unit standard / community with A&E)
- *   1 — Level IV (US Level IV–V / UK Local ED / rural clinic / no A&E)
+ *   1 — Level IV (US Level IV–V / UK Local ED / rural clinic / 24/7 ED but no trauma designation)
+ *   0 — NTC (Non-Trauma Center: no emergency department, or an ED that is not open 24/7)
  *
  * NOTE: US ACS trauma levels run I (highest) → V (lowest) — the INVERSE of
  * this tier scale. Invert on ingest: usLevel 1 → tier 4, 2 → 3, 3 → 2, 4/5 → 1.
  *
+ * NTC (tier 0) is distinct from Level IV: Level IV still has a staffed 24/7 ED,
+ * just no formal trauma designation. NTC facilities are excluded from the trauma
+ * PACE plan regardless of distance from the target — see isNonTraumaCenter().
+ * A formal trauma/MTC designation always overrides an NTC heuristic result.
+ *
  * USER-FACING LABELS: Always use careLevelLabel() / careLevelRoman() so the UI
- * consistently shows "Level I–IV" without exposing the internal tier number.
+ * consistently shows "Level I–IV" / "NTC" without exposing the internal tier number.
  */
 
 /** Exquisite capability flags — subset relevant for trauma triage. */
@@ -33,8 +39,16 @@ export const ALL_CAPABILITY_FLAGS: CapabilityFlag[] = [
   'neuro', 'burns', 'cardiothoracic', 'surgical', 'pediatric', 'obstetric', 'vascular', 'hyperbaric',
 ]
 
-/** Internal care tier (1–4, higher = more capable). */
-export type CareTier = 1 | 2 | 3 | 4
+/** Internal care tier (0–4, higher = more capable). 0 = NTC (non-trauma center). */
+export type CareTier = 0 | 1 | 2 | 3 | 4
+
+/** Tier value for a Non-Trauma Center — no 24/7 ED. Use isNonTraumaCenter() to test. */
+export const NTC_TIER: CareTier = 0
+
+/** True when a tier represents a Non-Trauma Center (no 24/7 ED). */
+export function isNonTraumaCenter(tier: CareTier): boolean {
+  return tier === NTC_TIER
+}
 
 /**
  * Convert a US ACS/State trauma level number to internal tier.
@@ -77,18 +91,57 @@ export function ukClassificationToTier(cls: string): CareTier {
 }
 
 /**
+ * True when an OSM/HIFLD opening-hours style string represents round-the-clock
+ * service: "24/7", "Mo-Su 00:00-24:00", "00:00-24:00", or a closing time that
+ * rolls to midnight ("...-23:59" / "...-24:00"). Conservative: anything else
+ * (specific days, specific hours, "by appointment", empty) is treated as not 24/7.
+ */
+export function isOpen24x7(hours: string): boolean {
+  const s = hours.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!s) return false
+  if (s === '24/7') return true
+  // Strip an optional day range prefix (e.g. "mo-su ") — any day coverage is fine,
+  // the thing that matters here is whether the time span itself is round-the-clock.
+  const timePart = s.replace(/^[a-z,\s-]+(?=\d)/, '')
+  return /^(00:00-24:00|00:00-23:59|0:00-24:00)$/.test(timePart)
+}
+
+/**
+ * Determine whether a hospital's emergency department is open 24/7, using
+ * the ED-specific hours tag first and falling back to the hospital's general
+ * hours tag only when no ED-specific tag is present.
+ *
+ * `opening_hours:emergency` is authoritative when present — some hospitals tag
+ * general `opening_hours` with outpatient/clinic/visiting hours even though
+ * their ED runs around the clock, so falling back to it when an ED-specific
+ * tag exists would wrongly demote a real 24/7 ED.
+ */
+export function edIs24x7(tags: {
+  openingHoursEmergency?: string
+  openingHours?: string
+}): boolean {
+  if (tags.openingHoursEmergency) return isOpen24x7(tags.openingHoursEmergency)
+  if (tags.openingHours) return isOpen24x7(tags.openingHours)
+  // No hours tag at all — assume 24/7 (most EDs are); absence of data is not
+  // itself evidence of restricted hours. `hasEmergency` is what gates NTC.
+  return true
+}
+
+/**
  * OSM heuristic: derive a care tier from OSM tags + bed count.
  * Used as fallback when no formal trauma classification is available.
  *
- * Logic (Level I → IV, higher is better capability):
- *  - Level I (tier 4): A&E + neurosurgery + surgical capability
- *  - Level II (tier 3): A&E + surgical capability OR A&E + large hospital (>150 beds)
- *  - Level III (tier 2): A&E/ED present (emergency=yes) — community hospital with ER
- *  - Level IV (tier 1): No emergency department tagged
+ * Logic (NTC → Level I, higher is better capability):
+ *  - NTC (tier 0): no emergency department, or an ED present but not open 24/7
+ *  - Level I (tier 4): 24/7 A&E + neurosurgery + surgical capability
+ *  - Level II (tier 3): 24/7 A&E + surgical capability OR A&E + large hospital (>150 beds)
+ *  - Level III (tier 2): 24/7 A&E/ED present (emergency=yes) — community hospital with ER
+ *  - Level IV (tier 1): reserved for formal classification only; the heuristic alone
+ *    never lands here — a hospital either has a qualifying 24/7 ED (tier ≥2) or is NTC (tier 0)
  *
- * Key change from naive heuristic: ANY hospital with emergency=yes is at least
- * Level III. Previously, missing bed count + speciality data caused UK/NHS hospitals
- * to always fall to Level IV despite having active A&E departments.
+ * Key change from naive heuristic: ANY hospital with a 24/7 emergency=yes is at
+ * least Level III. Previously, missing bed count + speciality data caused UK/NHS
+ * hospitals to always fall to Level IV despite having active A&E departments.
  *
  * Level I note: the previous heuristic additionally required burns OR cardiothoracic
  * for tier 4. Those specialities are very rarely tagged in OSM for non-UK/US
@@ -117,8 +170,8 @@ export function osmHeuristicTier(opts: {
   if (hasEmergency && beds > 150) return 3
   // Level III: any A&E/ED present (minimum for active emergency care)
   if (hasEmergency) return 2
-  // Level IV: no emergency department
-  return 1
+  // NTC: no emergency department (or an ED present but not 24/7 — gated by the caller)
+  return 0
 }
 
 /**
@@ -131,6 +184,7 @@ export function careLevelLabel(tier: CareTier): string {
     case 3: return 'Level II — Major'
     case 2: return 'Level III — Intermediate'
     case 1: return 'Level IV — Basic'
+    case 0: return 'NTC — Non-Trauma Center'
   }
 }
 
@@ -143,6 +197,7 @@ export function careLevelRoman(tier: CareTier): string {
     case 3: return 'II'
     case 2: return 'III'
     case 1: return 'IV'
+    case 0: return 'NTC'
   }
 }
 

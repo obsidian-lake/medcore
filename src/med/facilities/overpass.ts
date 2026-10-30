@@ -16,6 +16,7 @@ import {
   ukClassificationToTier,
   inferCapsFromName,
   inferCapsFromClassifiedTier,
+  edIs24x7,
   type CareTier,
   type CapabilityFlag,
 } from '../careLevel'
@@ -70,7 +71,7 @@ const OVERPASS_ENDPOINTS = [
 // server can reply. 45 s gives 10 s of network + queuing headroom.
 const OVERPASS_TIMEOUT_MS = 45_000
 
-const CACHE_PREFIX = 'medplanner-overpass-v2-'
+const CACHE_PREFIX = 'medplanner-overpass-v3-'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000   // 7 days
 const HELIPAD_ASSOC_RADIUS_M = 300              // associate helipad to hospital within this distance
 
@@ -197,6 +198,13 @@ export function parseElement(el: RawElement): { hospital?: Omit<OsmFacility, 'ha
   const specialStr   = tags['healthcare:speciality'] ?? tags['medical_system:speciality'] ?? ''
   const specialities = specialStr ? specialStr.split(/[;,]/).map(s => s.trim()).filter(Boolean) : []
 
+  // NTC determination: a hospital with no 24/7 ED is excluded from the trauma
+  // PACE plan regardless of distance. `opening_hours:emergency` is authoritative
+  // when tagged; `opening_hours` is only consulted as a fallback (see edIs24x7).
+  const openingHoursEmergency = tags['opening_hours:emergency'] ?? ''
+  const openingHours          = tags['opening_hours'] ?? ''
+  const effectiveEmergency = hasEmergency && edIs24x7({ openingHoursEmergency, openingHours })
+
   // Build address from OSM addr: tags
   const addrParts = [
     tags['addr:housenumber'],
@@ -207,7 +215,7 @@ export function parseElement(el: RawElement): { hospital?: Omit<OsmFacility, 'ha
   ].filter(Boolean)
   const address = addrParts.join(', ')
 
-  const heuristicTier = osmHeuristicTier({ hasEmergency, specialities, beds })
+  const heuristicTier = osmHeuristicTier({ hasEmergency: effectiveEmergency, specialities, beds })
 
   // Classify care tier from explicit OSM trauma/level tags.
   // Takes the better of the heuristic tier and any formal designation.

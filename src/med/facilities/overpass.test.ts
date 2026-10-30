@@ -69,6 +69,58 @@ describe('parseElement — relation', () => {
   })
 })
 
+// ── parseElement — NTC (no 24/7 ED) ──────────────────────────────────────────
+
+describe('parseElement — NTC (no 24/7 ED)', () => {
+  function hospitalEl(tags: Record<string, string>): RawElement {
+    return { type: 'node', id: 1, lat: 40, lon: -75, tags: { amenity: 'hospital', name: 'Test Hospital', ...tags } }
+  }
+
+  test('no emergency tag at all → tier 0 (NTC)', () => {
+    const result = parseElement(hospitalEl({}))
+    expect(result.hospital?.tier).toBe(0)
+  })
+
+  test('emergency=yes with no hours tag → not NTC (tier ≥ 2)', () => {
+    const result = parseElement(hospitalEl({ emergency: 'yes' }))
+    expect(result.hospital?.tier).toBeGreaterThanOrEqual(2)
+  })
+
+  test('emergency=yes + opening_hours:emergency=24/7 → not NTC', () => {
+    const result = parseElement(hospitalEl({ emergency: 'yes', 'opening_hours:emergency': '24/7' }))
+    expect(result.hospital?.tier).toBeGreaterThanOrEqual(2)
+  })
+
+  test('emergency=yes + restricted opening_hours:emergency → tier 0 (NTC)', () => {
+    const result = parseElement(hospitalEl({ emergency: 'yes', 'opening_hours:emergency': 'Mo-Fr 08:00-17:00' }))
+    expect(result.hospital?.tier).toBe(0)
+  })
+
+  test('emergency=yes + restricted general opening_hours (no ED-specific tag) → tier 0 (NTC)', () => {
+    const result = parseElement(hospitalEl({ emergency: 'yes', 'opening_hours': 'Mo-Fr 08:00-17:00' }))
+    expect(result.hospital?.tier).toBe(0)
+  })
+
+  test('ED-specific 24/7 tag wins over a restricted general opening_hours', () => {
+    const result = parseElement(hospitalEl({
+      emergency: 'yes',
+      'opening_hours:emergency': '24/7',
+      'opening_hours': 'Mo-Fr 09:00-17:00',
+    }))
+    expect(result.hospital?.tier).toBeGreaterThanOrEqual(2)
+  })
+
+  test('raw hasEmergency stays true even when the ED is not 24/7 (NTC only affects tier)', () => {
+    const result = parseElement(hospitalEl({ emergency: 'yes', 'opening_hours:emergency': 'Mo-Fr 08:00-17:00' }))
+    expect(result.hospital?.hasEmergency).toBe(true)
+  })
+
+  test('a formal trauma designation overrides an NTC heuristic result', () => {
+    const result = parseElement(hospitalEl({ trauma: 'trauma_centre' }))
+    expect(result.hospital?.tier).toBe(4)
+  })
+})
+
 // ── parseElement — tier 4 via knownMtc registry ───────────────────────────────
 
 describe('parseElement — Addenbrooke\'s promoted to tier 4 via knownMtc', () => {
@@ -199,7 +251,7 @@ describe('fetchOverpass mirror failover', () => {
 
   test('all mirrors 504 with valid cache (forceRefresh) → returns cached value', async () => {
     // Seed a fresh (non-expired) cache entry.
-    const key = 'medplanner-overpass-v2-52.00,0.10,80000'
+    const key = 'medplanner-overpass-v3-52.00,0.10,80000'
     const cachedHospital = {
       source: 'osm', osmId: 42, name: 'Cached Hospital', lat: 52.0, lon: 0.1,
       phone: '', address: '', hasEmergency: true, beds: 100, specialities: [],
@@ -215,7 +267,7 @@ describe('fetchOverpass mirror failover', () => {
   })
 
   test('cache hit (no forceRefresh) → returns cache without any network request', async () => {
-    const key = 'medplanner-overpass-v2-52.00,0.10,80000'
+    const key = 'medplanner-overpass-v3-52.00,0.10,80000'
     const cachedHospital = {
       source: 'osm', osmId: 7, name: 'Warm Cache Hospital', lat: 52.0, lon: 0.1,
       phone: '', address: '', hasEmergency: false, beds: 50, specialities: [],

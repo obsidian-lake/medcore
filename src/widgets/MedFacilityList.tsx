@@ -16,7 +16,7 @@ import { useState } from 'react'
 import type { FacilityRecord, FacilityOverride } from '../med/facilities/merge'
 import type { CustomFacility } from '../types/customFacility'
 import type { CareTier, CapabilityFlag } from '../med/careLevel'
-import { ALL_CAPABILITY_FLAGS } from '../med/careLevel'
+import { ALL_CAPABILITY_FLAGS, isNonTraumaCenter } from '../med/careLevel'
 import type { FacilityScore } from '../med/rank'
 import { formatTransit, tierDisplayLabel, transitColorClass } from '../med/rank'
 import type { FacilityPace } from '../med/pace'
@@ -37,6 +37,7 @@ const TIER_OPTIONS: { value: CareTier; label: string }[] = [
   { value: 3, label: 'Level II — Major (Trauma Unit+)' },
   { value: 2, label: 'Level III — Intermediate (Trauma Unit / A&E)' },
   { value: 1, label: 'Level IV — Basic (Local ED / no trauma surgery)' },
+  { value: 0, label: 'NTC — Non-Trauma Center (no 24/7 ED, not PACE-eligible)' },
 ]
 
 function emptyCustom(): Omit<CustomFacility, 'id'> {
@@ -187,6 +188,8 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
     const fac = fs.facility
     const ov = state.facilityOverrides[fac.id]
     const isExcluded = ov?.excludeFromPace ?? fac.excludeFromPace ?? false
+    const isNtc = isNonTraumaCenter(fac.tier) && !fac.isChamber
+    const isMuted = isExcluded || isNtc
     const isEditingThis = editFacId === fac.id
     const isDragging = dragSrcId === fac.id
     const isDragOver = dragOverId === fac.id && dragSrcId !== fac.id
@@ -198,12 +201,12 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
         onDragOver={e => { e.preventDefault(); setDragOverId(fac.id) }}
         onDrop={e => { e.preventDefault(); handleDrop(fac.id, group) }}
         onDragEnd={() => { setDragSrcId(null); setDragOverId(null) }}
-        className={`facility-item${fac.isCustom ? ' custom' : ''}${isExcluded ? ' excluded-from-pace' : ''}${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}`}
+        className={`facility-item${fac.isCustom ? ' custom' : ''}${isMuted ? ' excluded-from-pace' : ''}${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}`}
       >
         <div className="row">
           <span className="drag-handle" title="Drag to reorder">⠿</span>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)', minWidth: 24 }}>#{i+1}</span>
-          <span className="facility-name" style={{ opacity: isExcluded ? 0.5 : 1 }}>{fac.name}</span>
+          <span className="facility-name" style={{ opacity: isMuted ? 0.5 : 1 }}>{fac.name}</span>
           {fac.isChamber && (
             <span style={{ marginLeft: 4, fontSize: 10, fontFamily: 'var(--mono)', color: '#26c6da', border: '1px solid #26c6da', padding: '1px 5px', borderRadius: 2 }}>
               CHAMBER
@@ -217,6 +220,11 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
           {isExcluded && (
             <span style={{ marginLeft: 4, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--danger)' }}>
               [EXCL]
+            </span>
+          )}
+          {!isExcluded && isNtc && (
+            <span style={{ marginLeft: 4, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-dim)' }} title="No 24/7 ED — not PACE-eligible">
+              [NTC]
             </span>
           )}
           <span className="spacer" />
@@ -297,7 +305,7 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
           </div>
         )}
 
-        <div className="facility-tier" style={{ opacity: isExcluded ? 0.5 : 1 }}>{tierDisplayLabel(fac.tier)}</div>
+        <div className="facility-tier" style={{ opacity: isMuted ? 0.5 : 1 }}>{tierDisplayLabel(fac.tier)}</div>
         <div className="facility-detail dim" style={{ fontSize: 10 }}>
           {latLonToMgrs(fac.lat, fac.lon)}
         </div>

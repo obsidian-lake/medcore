@@ -24,7 +24,7 @@ import { applyPolylineOffsetPatch, assignRouteOffsets } from './polylineOffset'
 import type { MapLabel } from '../types/mapLabel'
 import { formatTransit } from '../med/rank'
 import { inverse } from '../calc/geo'
-import { careLevelRoman } from '../med/careLevel'
+import { careLevelRoman, type CareTier } from '../med/careLevel'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -510,7 +510,7 @@ export async function renderMedMapToCanvas(
       const routeOffset = routeOffsets.get(fac.id) ?? 0
       const paceLetter = paceLetterForFacility(fac.id, facilityPace)
       const color = paceLetter ? paceLetterColor(paceLetter) : tierColor(fac.tier)
-      const levelStr = `Lvl ${careLevelRoman(fac.tier as 1 | 2 | 3 | 4)}`
+      const levelStr = `Lvl ${careLevelRoman(fac.tier as CareTier)}`
       const label = paceLetter
         ? `[${paceLetter}] ${fac.name} — ${levelStr}`
         : `${fac.name} — ${levelStr}`
