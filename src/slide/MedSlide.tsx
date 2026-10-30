@@ -78,16 +78,6 @@ function toTelHref(phone: string): string {
   return `tel:${digits}`
 }
 
-// The facility-name column in the (tighter) non-dive PACE table is ~340px at fontSize 9
-// Courier New (~5.4px/char) — this caps the address+notes line a bit under that so it
-// never needs to wrap, since row height isn't otherwise bounded and an unbounded line
-// here both overflows this section into the one below it and (once that's blocked) gets
-// clipped anyway. whiteSpace:nowrap + textOverflow:ellipsis below are a second guard.
-const INFO_LINE_MAX_CHARS = 56
-function truncateInfoLine(s: string): string {
-  return s.length > INFO_LINE_MAX_CHARS ? s.slice(0, INFO_LINE_MAX_CHARS - 1) + '…' : s
-}
-
 /** Small "LVL {roman}" pill — used in both the PACE tables and the Echelons of Care block. */
 function LevelBadge({ tier, style }: { tier: CareTier; style?: CSSProperties }) {
   return (
@@ -132,16 +122,22 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                   Ph: {fac.phone}
                 </a>
               )}
-              {/* Notes share the address's line rather than adding their own, and the
-                  combined line is forced to a single row (see INFO_LINE_MAX_CHARS above) —
-                  letting it wrap grows row height unpredictably, which either overflows
-                  this section into Treatment PACE below it or gets silently clipped. */}
-              {(fac.address || fac.notes) && (
+              {fac.address && (
                 <div
-                  data-maps-url={fac.address ? `https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}` : undefined}
-                  style={{ fontSize: 9, color: '#6a9a6a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  data-maps-url={`https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}`}
+                  style={{ fontSize: 9, color: '#6a9a6a' }}
                 >
-                  {truncateInfoLine([fac.address, fac.notes].filter(Boolean).join(' — '))}
+                  {fac.address.slice(0, 50)}
+                </div>
+              )}
+              {/* Full text, wrapped rather than truncated — safety-relevant info (e.g.
+                  "helipad is for civilian aircraft only") needs to stay legible. Facility
+                  PACE is sized to its content (not flex:1) specifically so this can grow
+                  the section instead of being clipped; Treatment PACE below absorbs the
+                  resulting slack. */}
+              {fac.notes && (
+                <div style={{ fontSize: 9, color: '#6a9a6a', marginTop: 1, overflowWrap: 'break-word' }}>
+                  {fac.notes}
                 </div>
               )}
             </td>
@@ -189,10 +185,12 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
 
           {state.diveMode && chamberPace ? (
             // ── Dive mode: top half split into Hospital + Chamber tables ──────
-            <div style={{ flex: 1, borderBottom: '1px solid #2a4a2a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            // Sized to content (not flex:1) — see the comment on the non-dive table
+            // below for why: Treatment PACE is what absorbs the remaining space.
+            <div style={{ flexShrink: 0, borderBottom: '1px solid #2a4a2a', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
               {/* Hospital PACE (top quarter) */}
-              <div style={{ flex: 1, borderBottom: '1px solid #2a4a2a', padding: '6px 12px', overflow: 'hidden' }}>
+              <div style={{ flexShrink: 0, borderBottom: '1px solid #2a4a2a', padding: '6px 12px', overflow: 'hidden' }}>
                 <div style={{ fontSize: 9, letterSpacing: 2, color: '#81c784', marginBottom: 4, fontWeight: 700 }}>
                   PACE — HOSPITALS (TRAUMA / MECHANICAL)
                 </div>
@@ -218,7 +216,7 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
               </div>
 
               {/* Chamber PACE (bottom quarter of top half) */}
-              <div style={{ flex: 1, padding: '6px 12px', overflow: 'hidden' }}>
+              <div style={{ flexShrink: 0, padding: '6px 12px', overflow: 'hidden' }}>
                 <div style={{ fontSize: 9, letterSpacing: 2, color: '#26c6da', marginBottom: 4, fontWeight: 700 }}>
                   PACE — CHAMBERS (RECOMPRESSION / DCS)
                 </div>
@@ -233,7 +231,13 @@ export const MedSlide = forwardRef<HTMLDivElement, Props>(function MedSlide({ st
             </div>
           ) : (
             // ── Normal mode: single facility PACE table ────────────────────────
-            <div style={{ flex: 1, borderBottom: '1px solid #2a4a2a', padding: '8px 12px', overflow: 'hidden' }}>
+            // Sized to its content (flexShrink:0, not flex:1) rather than splitting the
+            // column 50/50 with Treatment PACE below. Facility notes can contain
+            // safety-relevant info (e.g. "helipad is for civilian aircraft only") that
+            // needs to stay legible rather than being truncated/clipped to fit a fixed
+            // half — so this table is allowed to grow with its content, and Treatment
+            // PACE (flex:1, overflow:hidden) absorbs whatever space is left.
+            <div style={{ flexShrink: 0, borderBottom: '1px solid #2a4a2a', padding: '8px 12px', overflow: 'hidden' }}>
               <div style={{ fontSize: 10, letterSpacing: 2, color: '#81c784', marginBottom: 6, fontWeight: 700 }}>
                 PACE — MEDICAL FACILITIES
               </div>
