@@ -122,17 +122,15 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                   Ph: {fac.phone}
                 </a>
               )}
-              {fac.address && (
+              {/* Notes share the address's line rather than adding their own — table row
+                  height isn't capped here, so an unconditional extra line pushed rows tall
+                  enough to overflow this section into the one below it (Treatment PACE). */}
+              {(fac.address || fac.notes) && (
                 <div
-                  data-maps-url={`https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}`}
-                  style={{ fontSize: 9, color: '#6a9a6a' }}
+                  data-maps-url={fac.address ? `https://www.google.com/maps/dir/?api=1&destination=${fac.lat},${fac.lon}` : undefined}
+                  style={{ fontSize: 9, color: '#6a9a6a', overflowWrap: 'break-word' }}
                 >
-                  {fac.address.slice(0, 50)}
-                </div>
-              )}
-              {fac.notes && (
-                <div style={{ fontSize: 9, color: '#6a9a6a', marginTop: 1, overflowWrap: 'break-word' }}>
-                  {fac.notes}
+                  {[fac.address?.slice(0, 50), fac.notes?.slice(0, 60)].filter(Boolean).join(' — ')}
                 </div>
               )}
             </td>
