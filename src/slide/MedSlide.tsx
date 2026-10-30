@@ -136,8 +136,8 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                   the section instead of being clipped; Treatment PACE below absorbs the
                   resulting slack. */}
               {fac.notes && (
-                <div style={{ fontSize: 9, color: '#6a9a6a', marginTop: 1, overflowWrap: 'break-word' }}>
-                  {fac.notes}
+                <div style={{ fontSize: 9, color: '#4fc3f7', marginTop: 1, overflowWrap: 'break-word' }}>
+                  📝 {fac.notes}
                 </div>
               )}
             </td>
