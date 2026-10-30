@@ -130,6 +130,11 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                   {fac.address.slice(0, 50)}
                 </div>
               )}
+              {fac.notes && (
+                <div style={{ fontSize: 9, color: '#6a9a6a', marginTop: 1, overflowWrap: 'break-word' }}>
+                  {fac.notes}
+                </div>
+              )}
             </td>
             <td style={{ padding: '4px 4px', fontSize: 11, color: transitColorHex(entry.transit.groundDurationS) }}>
               {formatTransit(entry.transit.groundDurationS)}
