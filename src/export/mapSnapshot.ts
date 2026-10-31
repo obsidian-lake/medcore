@@ -410,17 +410,18 @@ function blitEchelonInset(
   // Dark border / shadow behind inset
   ctx.save()
   ctx.fillStyle = 'rgba(0,0,0,0.70)'
-  ctx.fillRect(bx - 2 * s, by - 2 * s, iw + 4 * s, ih + 4 * s)
+  ctx.fillRect(bx - 4 * s, by - 4 * s, iw + 8 * s, ih + 8 * s)
   ctx.restore()
 
   // Inset imagery
   ctx.drawImage(insetCanvas, bx, by)
 
-  // Thin bright border around inset
+  // Thick bright border around inset — kept entirely within the dark backing
+  // margin (centered 2*s out) so it never overlaps the inset imagery itself.
   ctx.save()
-  ctx.strokeStyle = 'rgba(255,255,255,0.45)'
-  ctx.lineWidth = 1 * s
-  ctx.strokeRect(bx - 1, by - 1, iw + 2, ih + 2)
+  ctx.strokeStyle = 'rgba(255,255,255,0.85)'
+  ctx.lineWidth = 3 * s
+  ctx.strokeRect(bx - 2 * s, by - 2 * s, iw + 4 * s, ih + 4 * s)
   ctx.restore()
 
   // "ECHELONS OF CARE" chip label at top-left of inset

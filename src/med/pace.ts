@@ -17,12 +17,12 @@
  *    P = TCCC / Self-Aid / Team Medic (with life/limb/eyesight coordination note)
  *    A = Organic air platform IAW facility PACE plan; team medic continuous care en-route
  *    C = Coordinate local EMS (auto-detected number from country code)
- *    E = Team organic vehicle — ground transport to nearest facility
+ *    E = Team organic vehicle — ground transport to primary facility
  *
  *    Training (no organic air — items promoted):
  *    P = TCCC / Self-Aid / Team Medic
  *    A = Coordinate local EMS (promoted from C)
- *    C = Team organic vehicle — ground transport to nearest facility (promoted from E)
+ *    C = Team organic vehicle — ground transport to primary facility (promoted from E)
  *    E = Team organic vehicle — ground transport + coordinate EMS handoff en-route
  *
  *    Operational (organic air available):
@@ -320,14 +320,14 @@ export function buildTreatmentPace(opts: BuildTreatmentPaceOpts): TreatmentPace 
 
   const airLabel = organicAssetLabel || 'Organic Air'
   const facilityRef = nearestFacilityName
-    ? `nearest facility (${nearestFacilityName})`
-    : 'nearest facility per facility PACE plan'
+    ? `primary facility (${nearestFacilityName})`
+    : 'primary facility per facility PACE plan'
 
   const pSlot = {
     label: 'TCCC / Self-Aid / Team Medic',
     detail: isOp
-      ? 'Apply TCCC protocols. Self-aid/buddy-aid per Card of 9. Control hemorrhage, establish airway, treat for shock.'
-      : 'Apply TCCC protocols. Self-aid/buddy-aid per Card of 9. Control hemorrhage, establish airway, treat for shock. If life, limb, or eyesight threatened — immediately coordinate and initiate follow-on care.',
+      ? 'Apply TCCC protocols. Control hemorrhage, establish airway, treat for shock.'
+      : 'Apply TCCC protocols. Control hemorrhage, establish airway, treat for shock. If life, limb, or eyesight threatened — immediately coordinate and initiate follow-on care.',
   }
 
   // A/C/E pool — 3 entries assigned in order to those three letters.
@@ -360,7 +360,7 @@ export function buildTreatmentPace(opts: BuildTreatmentPaceOpts): TreatmentPace 
   } else {
     const ems = {
       label: `Coordinate Local EMS — ${emergencyNumberStr}`,
-      detail: `Call ${emergencyNumberStr}. Provide location, number of casualties, mechanism of injury, and vital signs.`,
+      detail: `Call ${emergencyNumberStr}. BPT provide location and MIST report.`,
     }
     const ground = {
       label: 'Team Organic Vehicle — Ground Transport',

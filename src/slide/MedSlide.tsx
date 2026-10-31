@@ -30,6 +30,7 @@ import { formatTransit, transitColorHex } from '../med/rank'
 import { careLevelRoman } from '../med/careLevel'
 import type { CareTier } from '../med/careLevel'
 import type { EchelonPlan } from '../med/echelon'
+import { heloTransitS, DEFAULT_HELO_SPEED_KT } from '../med/routing/ors'
 import { latLonToMgrs } from '../calc/geo'
 import { formatTricareLanguageNote } from '../med/tricareLanguage'
 import type { BrandConfig } from './brand'
@@ -98,12 +99,22 @@ function LevelBadge({ tier, style }: { tier: CareTier; style?: CSSProperties }) 
 }
 
 /** Shared facility PACE table rows (reused for both hospital and chamber tables in dive mode). */
-function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable'> }) {
+function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable' | 'targetLat' | 'targetLon' | 'heloSpeedKt'> }) {
   return (
     <tbody>
       {entries.map(entry => {
         const fac = entry.facility
         const color = paceLetterColor(entry.letter)
+        // Air time + helipad status are shown regardless of organic-lift
+        // availability — they're informational for the medic (e.g. a civilian
+        // EMS or MEDEVAC asset may still fly even when the team's own rotary
+        // asset isn't available). Fall back to a fresh geodesic estimate when
+        // the stored transit didn't compute one (helo was suppressed upstream).
+        const heloS = entry.transit.heloDurationS ?? (
+          fac.hasHelipad
+            ? heloTransitS({ lat: state.targetLat, lon: state.targetLon }, { lat: fac.lat, lon: fac.lon }, state.heloSpeedKt || DEFAULT_HELO_SPEED_KT)
+            : null
+        )
         return (
           <tr key={entry.letter} style={{ borderBottom: '1px solid #1a2a1a' }}>
             <td style={{ padding: '4px 4px', fontWeight: 700, fontSize: 13, color }}>{entry.letter}</td>
@@ -152,10 +163,10 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
               {formatTransit(entry.transit.groundDurationS)}
             </td>
             <td style={{ padding: '4px 4px', fontSize: 11, color: '#81c784' }}>
-              {state.rotaryWingAvailable && fac.hasHelipad ? formatTransit(entry.transit.heloDurationS) : '—'}
+              {fac.hasHelipad ? formatTransit(heloS) : '—'}
             </td>
-            <td style={{ padding: '4px 4px', fontSize: 11, color: state.rotaryWingAvailable && fac.hasHelipad ? '#4caf50' : '#6a9a6a' }}>
-              {state.rotaryWingAvailable && fac.hasHelipad ? '✓' : '—'}
+            <td style={{ padding: '4px 4px', fontSize: 11, color: fac.hasHelipad ? '#4caf50' : '#6a9a6a' }}>
+              {fac.hasHelipad ? '✓' : '—'}
             </td>
           </tr>
         )
