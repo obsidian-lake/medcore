@@ -435,6 +435,7 @@ export function mergeFacilities(
 export type FacilityOverride = Partial<Pick<
   FacilityRecord,
   'name' | 'phone' | 'address' | 'beds' | 'hasHelipad' | 'tier' | 'capabilities' | 'notes' | 'excludeFromPace'
+  | 'inferredCapabilities'
 >>
 
 /**

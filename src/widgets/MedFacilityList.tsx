@@ -157,6 +157,35 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
     })
   }
 
+  // A tier-inferred ("~") capability is a guess, not sourced data — the medic
+  // confirms it (keep the capability, drop the "~") or denies it (remove the
+  // capability outright). Both just patch facilityOverrides directly, same
+  // as toggleExcludeFromPace, without requiring the full edit form to be open.
+  const confirmCapability = (fac: FacilityRecord, cap: CapabilityFlag) => {
+    const currentInferred = state.facilityOverrides[fac.id]?.inferredCapabilities ?? fac.inferredCapabilities ?? []
+    onPatch({
+      facilityOverrides: {
+        ...state.facilityOverrides,
+        [fac.id]: { ...(state.facilityOverrides[fac.id] ?? {}), inferredCapabilities: currentInferred.filter(c => c !== cap) },
+      },
+    })
+  }
+
+  const denyCapability = (fac: FacilityRecord, cap: CapabilityFlag) => {
+    const currentCaps = state.facilityOverrides[fac.id]?.capabilities ?? fac.capabilities
+    const currentInferred = state.facilityOverrides[fac.id]?.inferredCapabilities ?? fac.inferredCapabilities ?? []
+    onPatch({
+      facilityOverrides: {
+        ...state.facilityOverrides,
+        [fac.id]: {
+          ...(state.facilityOverrides[fac.id] ?? {}),
+          capabilities: currentCaps.filter(c => c !== cap),
+          inferredCapabilities: currentInferred.filter(c => c !== cap),
+        },
+      },
+    })
+  }
+
   // Builds a new facilityRankOrder after a drag-drop within a sub-list (or the full list).
   // Items not in `group` stay in their current relative positions.
   function buildNewOrder(fromId: string, toId: string, group: FacilityScore[]): string[] {
@@ -327,7 +356,27 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
           <div className="facility-caps mt8" style={{ marginTop: 4 }}>
             {fac.capabilities.map(c => {
               const inf = (fac.inferredCapabilities ?? []).includes(c)
-              return <span key={c} className={`cap-badge ${inf ? 'inferred' : 'present'}`}>{inf ? '~' : ''}{c}</span>
+              if (!inf) return <span key={c} className="cap-badge present">{c}</span>
+              return (
+                <span key={c} className="cap-badge inferred cap-badge-confirmable">
+                  <button
+                    type="button"
+                    className="cap-confirm"
+                    onClick={() => confirmCapability(fac, c)}
+                    title="Confirm — medic verifies this capability is actually present"
+                  >
+                    ~{c}
+                  </button>
+                  <button
+                    type="button"
+                    className="cap-deny"
+                    onClick={() => denyCapability(fac, c)}
+                    title="Deny — remove, not actually a capability"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )
             })}
             {fac.pediatricOnly && (
               <span className="cap-badge" style={{ color: '#ff9800', borderColor: '#ff9800' }}>
@@ -384,7 +433,7 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
             <button className="btn" onClick={() => onRefresh()} disabled={loading || !state.targetLat}>
               {loading ? 'Loading…' : 'Refresh Facilities'}
             </button>
-            <button className="btn btn-sm" onClick={openAdd}>+ Custom Facility</button>
+            <button className="btn" onClick={openAdd}>+ Custom Facility</button>
             <span className="dim mono" style={{ fontSize: 11 }}>
               {rankedFacilities.length} facilities ranked
             </span>
