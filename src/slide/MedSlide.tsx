@@ -53,6 +53,8 @@ export interface MedSlideInput {
   /** ISO 3166-1 alpha-2 country code (drives TRICARE language note). */
   countryCode: string
   diveMode: boolean
+  /** Golden-hour window in minutes (from rankingParams), used for transit colour coding. */
+  goldenHourMin: number
 }
 
 interface Props {
@@ -99,7 +101,7 @@ function LevelBadge({ tier, style }: { tier: CareTier; style?: CSSProperties }) 
 }
 
 /** Shared facility PACE table rows (reused for both hospital and chamber tables in dive mode). */
-function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable' | 'targetLat' | 'targetLon' | 'heloSpeedKt'> }) {
+function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; state: Pick<MedSlideInput, 'rotaryWingAvailable' | 'targetLat' | 'targetLon' | 'heloSpeedKt' | 'goldenHourMin'> }) {
   return (
     <tbody>
       {entries.map(entry => {
@@ -159,7 +161,7 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                 </div>
               )}
             </td>
-            <td style={{ padding: '4px 4px', fontSize: 11, color: transitColorHex(entry.transit.groundDurationS) }}>
+            <td style={{ padding: '4px 4px', fontSize: 11, color: transitColorHex(entry.transit.groundDurationS, state.goldenHourMin * 60) }}>
               {formatTransit(entry.transit.groundDurationS)}
             </td>
             <td style={{ padding: '4px 4px', fontSize: 11, color: '#81c784' }}>

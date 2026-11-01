@@ -200,7 +200,7 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
                 <div style={{ marginLeft: 28 }}>
                   <div className="transit-chips">
                     {entry.transit.groundDurationS !== null && (
-                      <span className={`transit-chip ${transitColorClass(entry.transit.groundDurationS)}`}>
+                      <span className={`transit-chip ${transitColorClass(entry.transit.groundDurationS, state.rankingParams.goldenHourMin * 60)}`}>
                         Ground: {formatTransit(entry.transit.groundDurationS)}
                       </span>
                     )}
@@ -437,7 +437,7 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
                   <div style={{ marginLeft: 28 }}>
                     <div className="transit-chips">
                       {entry.transit.groundDurationS !== null && (
-                        <span className={`transit-chip ${transitColorClass(entry.transit.groundDurationS)}`}>
+                        <span className={`transit-chip ${transitColorClass(entry.transit.groundDurationS, state.rankingParams.goldenHourMin * 60)}`}>
                           Ground: {formatTransit(entry.transit.groundDurationS)}
                         </span>
                       )}

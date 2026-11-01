@@ -377,7 +377,7 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
         </div>
         <div className="transit-chips">
           {fs.transit.groundDurationS !== null && (
-            <span className={`transit-chip ${transitColorClass(fs.transit.groundDurationS)}`}>
+            <span className={`transit-chip ${transitColorClass(fs.transit.groundDurationS, state.rankingParams.goldenHourMin * 60)}`}>
               Ground: {formatTransit(fs.transit.groundDurationS)}
             </span>
           )}
