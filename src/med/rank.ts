@@ -102,7 +102,7 @@ function capWeight(cap: CapabilityFlag, params: RankingParams): number {
   }
 }
 
-function scoreFacility(record: FacilityRecord, transit: TransitInfo, params: RankingParams): number {
+export function scoreFacility(record: FacilityRecord, transit: TransitInfo, params: RankingParams): number {
   const t = transit.effectiveDurationS
   const goldenHourS = params.goldenHourMin * 60
   const withinGH = t <= goldenHourS

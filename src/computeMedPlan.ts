@@ -16,8 +16,8 @@ import { enrichOsmAddresses } from './med/facilities/nominatim'
 import { selectChambersInRadius } from './med/facilities/hyperbaricChambers'
 import { selectTraumaCentersInRadius } from './med/facilities/traumaCenters'
 import { findNearestLevelIBeyondRadius, EXPANDED_LEVELI_RADIUS_M } from './med/facilities/expandedLevelI'
-import { rankFacilities } from './med/rank'
-import type { FacilityScore, RankResult } from './med/rank'
+import { rankFacilities, scoreFacility } from './med/rank'
+import type { FacilityScore, RankResult, TransitInfo } from './med/rank'
 import { buildFacilityPace, buildTreatmentPace } from './med/pace'
 import type { FacilityPace, TreatmentPace, PaceLetter } from './med/pace'
 import { normalizeRankingParams } from './med/rankingParams'
@@ -170,14 +170,16 @@ export async function computeMedPlan(
           const l1EffectiveS =
             l1HeloS !== null && l1GroundS !== null ? Math.min(l1HeloS, l1GroundS)
             : l1HeloS ?? l1GroundS ?? Infinity
+          const l1Transit: TransitInfo = { groundDurationS: l1GroundS, heloDurationS: l1HeloS, effectiveDurationS: l1EffectiveS }
           levelIScore = {
             facility: levelIFacility,
-            transit: { groundDurationS: l1GroundS, heloDurationS: l1HeloS, effectiveDurationS: l1EffectiveS },
-            score: 0,
+            transit: l1Transit,
+            score: scoreFacility(levelIFacility, l1Transit, rankingParams),
             withinGoldenHour: l1EffectiveS <= goldenHourS,
           }
           finalMerged = [...merged, levelIFacility]
-          rankResult = { ...rankResult, ranked: [...rankResult.ranked, levelIScore] }
+          const mergedRanked = [...rankResult.ranked, levelIScore].sort((a, b) => b.score - a.score)
+          rankResult = { ...rankResult, ranked: mergedRanked }
         }
       } catch { /* non-fatal */ }
 
@@ -265,7 +267,12 @@ export async function computeMedPlan(
   const pEntry = facilityPace.entries.find(e => e.letter === 'P')
   const pacePrimaryScore = pEntry
     ? rankResult.ranked.find(s => s.facility.id === pEntry.facility.id)
-      ?? { facility: pEntry.facility, transit: pEntry.transit, score: 0, withinGoldenHour: pEntry.transit.effectiveDurationS <= goldenHourS }
+      ?? {
+          facility: pEntry.facility,
+          transit: pEntry.transit,
+          score: scoreFacility(pEntry.facility, pEntry.transit, rankingParams),
+          withinGoldenHour: pEntry.transit.effectiveDurationS <= goldenHourS,
+        }
     : undefined
 
   let echelonNodes: EchelonNodes | null = selectEchelonNodes(
