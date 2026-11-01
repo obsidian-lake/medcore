@@ -25,6 +25,14 @@ function paceColor(letter: PaceLetter): string {
   }
 }
 
+/** Moves the item at `fromIdx` to `toIdx`, shifting the rest. */
+function reorder<T>(arr: T[], fromIdx: number, toIdx: number): T[] {
+  const copy = [...arr]
+  const [moved] = copy.splice(fromIdx, 1)
+  copy.splice(toIdx, 0, moved)
+  return copy
+}
+
 interface Props {
   state: MedWorkspaceState
   onPatch: MedWorkspacePatch
@@ -35,6 +43,66 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
   const { facilityPace, chamberPace, treatmentPace, echelonPlan, facilities: allFacilities } = state
   const [editTreatSlot, setEditTreatSlot] = useState<PaceLetter | null>(null)
   const [treatForm, setTreatForm] = useState<{ label: string; detail: string }>({ label: '', detail: '' })
+
+  // Drag-to-reorder state — one source/over pair per PACE table, so dragging
+  // in one table never interferes with the others.
+  const [facDragLetter, setFacDragLetter] = useState<PaceLetter | null>(null)
+  const [facDragOverLetter, setFacDragOverLetter] = useState<PaceLetter | null>(null)
+  const [chamberDragLetter, setChamberDragLetter] = useState<PaceLetter | null>(null)
+  const [chamberDragOverLetter, setChamberDragOverLetter] = useState<PaceLetter | null>(null)
+  const [treatDragLetter, setTreatDragLetter] = useState<PaceLetter | null>(null)
+  const [treatDragOverLetter, setTreatDragOverLetter] = useState<PaceLetter | null>(null)
+
+  // Reordering a PACE table pins every slot to an explicit facility id (or
+  // treatment content) for the letters involved — the letters themselves
+  // (P/A/C/E) never move, only what fills them, same as a single-slot override.
+  const handleFacilityPaceDrop = (toLetter: PaceLetter) => {
+    const fromLetter = facDragLetter
+    setFacDragLetter(null)
+    setFacDragOverLetter(null)
+    if (!fromLetter || fromLetter === toLetter || !facilityPace) return
+    const letterSeq = facilityPace.entries.map(e => e.letter)
+    const idSeq = facilityPace.entries.map(e => e.facility.id)
+    const fromIdx = letterSeq.indexOf(fromLetter)
+    const toIdx = letterSeq.indexOf(toLetter)
+    if (fromIdx === -1 || toIdx === -1) return
+    const newIds = reorder(idSeq, fromIdx, toIdx)
+    const overrides = { ...state.facilityPaceOverrides }
+    letterSeq.forEach((letter, i) => { overrides[letter] = newIds[i] })
+    onPatch({ facilityPaceOverrides: overrides })
+  }
+
+  const handleChamberPaceDrop = (toLetter: PaceLetter) => {
+    const fromLetter = chamberDragLetter
+    setChamberDragLetter(null)
+    setChamberDragOverLetter(null)
+    if (!fromLetter || fromLetter === toLetter || !chamberPace) return
+    const letterSeq = chamberPace.entries.map(e => e.letter)
+    const idSeq = chamberPace.entries.map(e => e.facility.id)
+    const fromIdx = letterSeq.indexOf(fromLetter)
+    const toIdx = letterSeq.indexOf(toLetter)
+    if (fromIdx === -1 || toIdx === -1) return
+    const newIds = reorder(idSeq, fromIdx, toIdx)
+    const overrides = { ...state.chamberPaceOverrides }
+    letterSeq.forEach((letter, i) => { overrides[letter] = newIds[i] })
+    onPatch({ chamberPaceOverrides: overrides })
+  }
+
+  const handleTreatmentPaceDrop = (toLetter: PaceLetter) => {
+    const fromLetter = treatDragLetter
+    setTreatDragLetter(null)
+    setTreatDragOverLetter(null)
+    if (!fromLetter || fromLetter === toLetter || !treatmentPace) return
+    const letterSeq = treatmentPace.entries.map(e => e.letter)
+    const contentSeq = treatmentPace.entries.map(e => ({ label: e.label, detail: e.detail }))
+    const fromIdx = letterSeq.indexOf(fromLetter)
+    const toIdx = letterSeq.indexOf(toLetter)
+    if (fromIdx === -1 || toIdx === -1) return
+    const newContent = reorder(contentSeq, fromIdx, toIdx)
+    const overrides = { ...state.treatmentPaceOverrides }
+    letterSeq.forEach((letter, i) => { overrides[letter] = newContent[i] })
+    onPatch({ treatmentPaceOverrides: overrides })
+  }
 
   const setFacilityPaceOverride = (letter: PaceLetter, facilityId: string | '') => {
     onPatch({
@@ -90,9 +158,21 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
           {facilityPace?.entries.map(entry => {
             const fac = entry.facility
             const letter = entry.letter
+            const isDragging = facDragLetter === letter
+            const isDragOver = facDragOverLetter === letter && facDragLetter !== letter
             return (
-              <div key={letter} style={{ marginBottom: 14 }}>
+              <div
+                key={letter}
+                draggable
+                onDragStart={() => setFacDragLetter(letter)}
+                onDragOver={e => { e.preventDefault(); setFacDragOverLetter(letter) }}
+                onDrop={e => { e.preventDefault(); handleFacilityPaceDrop(letter) }}
+                onDragEnd={() => { setFacDragLetter(null); setFacDragOverLetter(null) }}
+                className={`pace-entry${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}`}
+                style={{ marginBottom: 14 }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <span className="drag-handle" title="Drag to reorder">⠿</span>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: paceColor(letter), minWidth: 20 }}>
                     {letter}
                   </span>
@@ -321,9 +401,21 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
             {chamberPace?.entries.map(entry => {
               const fac = entry.facility
               const letter = entry.letter
+              const isDragging = chamberDragLetter === letter
+              const isDragOver = chamberDragOverLetter === letter && chamberDragLetter !== letter
               return (
-                <div key={letter} style={{ marginBottom: 14 }}>
+                <div
+                  key={letter}
+                  draggable
+                  onDragStart={() => setChamberDragLetter(letter)}
+                  onDragOver={e => { e.preventDefault(); setChamberDragOverLetter(letter) }}
+                  onDrop={e => { e.preventDefault(); handleChamberPaceDrop(letter) }}
+                  onDragEnd={() => { setChamberDragLetter(null); setChamberDragOverLetter(null) }}
+                  className={`pace-entry${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}`}
+                  style={{ marginBottom: 14 }}
+                >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span className="drag-handle" title="Drag to reorder">⠿</span>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: paceColor(letter), minWidth: 20 }}>
                       {letter}
                     </span>
@@ -422,10 +514,24 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
             )}
           </div>
 
-          {treatmentPace?.entries.map(entry => (
-            <div key={entry.letter} style={{ marginBottom: 14 }}>
+          {treatmentPace?.entries.map(entry => {
+            const letter = entry.letter as PaceLetter
+            const isDragging = treatDragLetter === letter
+            const isDragOver = treatDragOverLetter === letter && treatDragLetter !== letter
+            return (
+            <div
+              key={letter}
+              draggable
+              onDragStart={() => setTreatDragLetter(letter)}
+              onDragOver={e => { e.preventDefault(); setTreatDragOverLetter(letter) }}
+              onDrop={e => { e.preventDefault(); handleTreatmentPaceDrop(letter) }}
+              onDragEnd={() => { setTreatDragLetter(null); setTreatDragOverLetter(null) }}
+              className={`pace-entry${isDragging ? ' dragging' : ''}${isDragOver ? ' drag-over' : ''}`}
+              style={{ marginBottom: 14 }}
+            >
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: paceColor(entry.letter as PaceLetter), minWidth: 20 }}>
+                <span className="drag-handle" title="Drag to reorder">⠿</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: paceColor(letter), minWidth: 20 }}>
                   {entry.letter}
                 </span>
                 <span className="mono" style={{ fontWeight: 700, color: 'var(--text)', fontSize: 13 }}>
@@ -446,7 +552,8 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
                 {entry.detail}
               </div>
             </div>
-          ))}
+            )
+          })}
 
           {!treatmentPace && (
             <p className="no-results">Set target coordinates to generate treatment PACE.</p>
