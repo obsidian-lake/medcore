@@ -223,9 +223,10 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
 
   function renderRankingHeaderButtons() {
     return (
-      <span style={{ display: 'flex', gap: 4 }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         <button
-          className="btn btn-sm" style={{ fontSize: 10, padding: '2px 7px' }}
+          className="btn btn-sm"
+          style={{ fontSize: 15, lineHeight: 1, padding: '4px 9px' }}
           onClick={() => setShowRankingInfo(true)}
           title="How ranking & PACE work"
           aria-label="How ranking & PACE work"
@@ -233,7 +234,8 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
           ⓘ
         </button>
         <button
-          className="btn btn-sm" style={{ fontSize: 10, padding: '2px 7px', position: 'relative' }}
+          className="btn btn-sm"
+          style={{ fontSize: 15, lineHeight: 1, padding: '4px 9px', position: 'relative' }}
           onClick={() => setShowRankingSettings(true)}
           title="Ranking settings"
           aria-label="Ranking settings"
@@ -241,8 +243,8 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
           ⚙
           {rankingParamsTuned && (
             <span style={{
-              position: 'absolute', top: -3, right: -3, width: 6, height: 6,
-              borderRadius: '50%', background: 'var(--warn)',
+              position: 'absolute', top: -2, right: -2, width: 7, height: 7,
+              borderRadius: '50%', background: 'var(--warn)', border: '1px solid var(--bg3)',
             }} />
           )}
         </button>
