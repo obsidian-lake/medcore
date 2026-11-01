@@ -23,6 +23,9 @@ import type { FacilityPace } from '../med/pace'
 import { latLonToMgrs } from '../calc/geo'
 import { directionsUrl } from '../util/mapsLink'
 import type { MedWorkspaceState, MedWorkspacePatch } from '../med/workspaceState'
+import { isDefaultRankingParams } from '../med/rankingParams'
+import { RankingInfoModal } from './RankingInfoModal'
+import { RankingSettingsModal } from './RankingSettingsModal'
 
 interface Props {
   state: MedWorkspaceState
@@ -91,6 +94,11 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
   // Drag-and-drop reorder state
   const [dragSrcId, setDragSrcId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+
+  // Ranking info / settings pop-ups
+  const [showRankingInfo, setShowRankingInfo] = useState(false)
+  const [showRankingSettings, setShowRankingSettings] = useState(false)
+  const rankingParamsTuned = !isDefaultRankingParams(state.rankingParams)
 
   const openAdd = () => { setCustomForm(emptyCustom()); setEditCustomId(null); setShowAddCustom(true) }
   const openEdit = (fac: CustomFacility) => { setCustomForm({ ...fac }); setEditCustomId(fac.id); setShowAddCustom(true) }
@@ -212,6 +220,35 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
 
   const hospitalFacilities = rankedFacilities.filter(fs => !fs.facility.isChamber)
   const chamberFacilities = rankedFacilities.filter(fs => fs.facility.capabilities.includes('hyperbaric'))
+
+  function renderRankingHeaderButtons() {
+    return (
+      <span style={{ display: 'flex', gap: 4 }}>
+        <button
+          className="btn btn-sm" style={{ fontSize: 10, padding: '2px 7px' }}
+          onClick={() => setShowRankingInfo(true)}
+          title="How ranking & PACE work"
+          aria-label="How ranking & PACE work"
+        >
+          ⓘ
+        </button>
+        <button
+          className="btn btn-sm" style={{ fontSize: 10, padding: '2px 7px', position: 'relative' }}
+          onClick={() => setShowRankingSettings(true)}
+          title="Ranking settings"
+          aria-label="Ranking settings"
+        >
+          ⚙
+          {rankingParamsTuned && (
+            <span style={{
+              position: 'absolute', top: -3, right: -3, width: 6, height: 6,
+              borderRadius: '50%', background: 'var(--warn)',
+            }} />
+          )}
+        </button>
+      </span>
+    )
+  }
 
   function renderFacilityItem(fs: FacilityScore, i: number, paceLetter: string, group: FacilityScore[]) {
     const fac = fs.facility
@@ -563,9 +600,12 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
           <div className="section">
             <div className="section-header" style={{ color: 'var(--accent2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>HOSPITAL FACILITIES — TRAUMA / MECHANICAL ({hospitalFacilities.length})</span>
-              {state.facilityRankOrder && (
-                <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => onPatch({ facilityRankOrder: null })}>Reset Order</button>
-              )}
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {renderRankingHeaderButtons()}
+                {state.facilityRankOrder && (
+                  <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => onPatch({ facilityRankOrder: null })}>Reset Order</button>
+                )}
+              </span>
             </div>
             <div className="section-body">
               {hospitalFacilities.length === 0 ? (
@@ -597,9 +637,12 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
         <div className="section">
           <div className="section-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span>RANKED FACILITIES ({rankedFacilities.length})</span>
-            {state.facilityRankOrder && (
-              <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => onPatch({ facilityRankOrder: null })}>Reset Order</button>
-            )}
+            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {renderRankingHeaderButtons()}
+              {state.facilityRankOrder && (
+                <button className="btn btn-sm" style={{ fontSize: 10 }} onClick={() => onPatch({ facilityRankOrder: null })}>Reset Order</button>
+              )}
+            </span>
           </div>
           <div className="section-body">
             {rankedFacilities.length === 0 ? (
@@ -611,6 +654,17 @@ export function MedFacilityList({ state, onPatch, rankedFacilities, onRefresh, l
             )}
           </div>
         </div>
+      )}
+
+      {showRankingInfo && (
+        <RankingInfoModal params={state.rankingParams} onClose={() => setShowRankingInfo(false)} />
+      )}
+      {showRankingSettings && (
+        <RankingSettingsModal
+          params={state.rankingParams}
+          onClose={() => setShowRankingSettings(false)}
+          onApply={params => { onPatch({ rankingParams: params }); setShowRankingSettings(false) }}
+        />
       )}
     </div>
   )

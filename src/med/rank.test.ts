@@ -15,6 +15,7 @@ import type { RankInput } from './rank'
 import { applyOverrides } from './facilities/merge'
 import type { FacilityRecord } from './facilities/merge'
 import type { CapabilityFlag } from './careLevel'
+import { DEFAULT_RANKING_PARAMS, normalizeRankingParams } from './rankingParams'
 
 function mkFacility(overrides: Partial<FacilityRecord>): FacilityRecord {
   return {
@@ -266,6 +267,64 @@ describe('rankFacilities — dive mode (requiredCapability: hyperbaric)', () => 
 
     const { phasedRecommendation } = rankFacilities([chamberT4, plainT2], 'hyperbaric')
     expect(phasedRecommendation).toBeUndefined()
+  })
+})
+
+describe('rankFacilities with custom params', () => {
+
+  test('default params argument reproduces the no-params result', () => {
+    const inputs: RankInput[] = [mkInput(4, 1800), mkInput(2, 900), mkInput(1, 2000)]
+    const withDefault = rankFacilities(inputs, undefined, DEFAULT_RANKING_PARAMS)
+    const noParams = rankFacilities(inputs)
+    expect(withDefault.ranked.map(r => r.score)).toEqual(noParams.ranked.map(r => r.score))
+    expect(withDefault.ranked.map(r => r.facility.id)).toEqual(noParams.ranked.map(r => r.facility.id))
+  })
+
+  test('shrinking the golden-hour window changes the within-window flag', () => {
+    const inputs: RankInput[] = [mkInput(2, 40 * 60)]  // 40 min
+    const params = normalizeRankingParams({ goldenHourMin: 30 })
+    const { ranked } = rankFacilities(inputs, undefined, params)
+    expect(ranked[0].withinGoldenHour).toBe(false)
+  })
+
+  test('raising levelWeight widens the gap a higher tier opens over transit penalties', () => {
+    const inputs: RankInput[] = [mkInput(4, 110 * 60), mkInput(1, 5 * 60)]
+    const defaultResult = rankFacilities(inputs)
+    const highWeightResult = rankFacilities(inputs, undefined, normalizeRankingParams({ levelWeight: 500 }))
+    const defaultGap = defaultResult.ranked[0].score - defaultResult.ranked[1].score
+    const highWeightGap = highWeightResult.ranked[0].score - highWeightResult.ranked[1].score
+    expect(highWeightGap).toBeGreaterThan(defaultGap)
+  })
+
+  test('raising lateMinutePenalty can flip the order for a far higher-tier facility', () => {
+    const inputs: RankInput[] = [mkInput(4, 110 * 60), mkInput(2, 5 * 60)]
+    const { ranked: defaultRanked } = rankFacilities(inputs)
+    expect(defaultRanked[0].facility.tier).toBe(4)  // tier dominates by default
+
+    const steepPenalty = normalizeRankingParams({ lateMinutePenalty: 50 })
+    const { ranked: steepRanked } = rankFacilities(inputs, undefined, steepPenalty)
+    expect(steepRanked[0].facility.tier).toBe(2)  // steep enough penalty flips it
+  })
+
+  test('raising stabilizeTransferRatio suppresses a phased recommendation that would otherwise trigger', () => {
+    const farDefinitive = mkInput(4, 90 * 60)     // 90 min, beyond golden hour
+    const nearerLower   = mkInput(2, 40 * 60)     // 40 min — 2.25x closer, triggers default ratio 2.0
+    const { phasedRecommendation: defaultRec } = rankFacilities([farDefinitive, nearerLower])
+    expect(defaultRec).toBeDefined()
+
+    const strictRatio = normalizeRankingParams({ stabilizeTransferRatio: 4 })
+    const { phasedRecommendation: strictRec } = rankFacilities([farDefinitive, nearerLower], undefined, strictRatio)
+    expect(strictRec).toBeUndefined()
+  })
+
+  test('zeroing out a capability weight removes its scoring contribution', () => {
+    const inputs: RankInput[] = [mkInput(2, 1800, null, ['neuro'])]
+    const zeroed = normalizeRankingParams({ capWeights: { ...DEFAULT_RANKING_PARAMS.capWeights, neuro: 0 } })
+    const { ranked } = rankFacilities(inputs, undefined, zeroed)
+    // Sanity: with neuro weighted to 0, score should equal the same facility with no capabilities at all.
+    const noCapsInput: RankInput[] = [mkInput(2, 1800, null, [])]
+    const { ranked: noCapsRanked } = rankFacilities(noCapsInput, undefined, zeroed)
+    expect(ranked[0].score).toBeCloseTo(noCapsRanked[0].score, 5)
   })
 
 })

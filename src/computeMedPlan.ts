@@ -20,6 +20,8 @@ import { rankFacilities } from './med/rank'
 import type { FacilityScore, RankResult } from './med/rank'
 import { buildFacilityPace, buildTreatmentPace } from './med/pace'
 import type { FacilityPace, TreatmentPace, PaceLetter } from './med/pace'
+import { normalizeRankingParams } from './med/rankingParams'
+import type { RankingParams } from './med/rankingParams'
 import { getRouteMatrix, heloTransitS, DEFAULT_HELO_SPEED_KT, FIXED_WING_SPEED_KT, AIRFRAMES, resetOrsFailure, getOrsFailure } from './med/routing/ors'
 import type { RouteResult } from './med/routing/ors'
 import { selectEchelonNodes, buildEchelonPlan, pickNearestLevelI, LEG2_DROP_GROUND_DIST_M, LEG2_FIXED_WING_DIST_M } from './med/echelon'
@@ -49,6 +51,8 @@ export interface ComputeMedPlanInput {
   facilityPaceOverrides?: Partial<Record<PaceLetter, string>>
   chamberPaceOverrides?: Partial<Record<PaceLetter, string>>
   treatmentPaceOverrides?: Partial<Record<PaceLetter, { label?: string; detail?: string }>>
+  /** Tunable ranking/PACE parameters (see med/rankingParams.ts). Defaults to DEFAULT_RANKING_PARAMS. */
+  rankingParams?: Partial<RankingParams>
 }
 
 export interface MedPlanResult {
@@ -83,6 +87,8 @@ export async function computeMedPlan(
   const target = { lat: input.lat, lon: input.lon }
   const heloSpeed = input.heloSpeedKt || DEFAULT_HELO_SPEED_KT
   const searchRadius = input.searchRadiusM
+  const rankingParams = normalizeRankingParams(input.rankingParams)
+  const goldenHourS = rankingParams.goldenHourMin * 60
 
   resetOrsFailure()
 
@@ -139,7 +145,7 @@ export async function computeMedPlan(
     groundDurationS: durations[i] > 0 ? durations[i] : null,
     heloDurationS: heloTransits[i],
   }))
-  let rankResult: RankResult = rankFacilities(rankInputs)
+  let rankResult: RankResult = rankFacilities(rankInputs, undefined, rankingParams)
 
   // 8. Level-I guarantee (echelon plan needs definitive care)
   let finalMerged: FacilityRecord[] = merged
@@ -168,7 +174,7 @@ export async function computeMedPlan(
             facility: levelIFacility,
             transit: { groundDurationS: l1GroundS, heloDurationS: l1HeloS, effectiveDurationS: l1EffectiveS },
             score: 0,
-            withinGoldenHour: l1EffectiveS <= 3600,
+            withinGoldenHour: l1EffectiveS <= goldenHourS,
           }
           finalMerged = [...merged, levelIFacility]
           rankResult = { ...rankResult, ranked: [...rankResult.ranked, levelIScore] }
@@ -194,6 +200,7 @@ export async function computeMedPlan(
     overrides: input.facilityPaceOverrides,
     allFacilities: finalMerged,
     poolMode: 'trauma',
+    params: rankingParams,
   })
 
   if (reducedRadiusM) {
@@ -229,6 +236,7 @@ export async function computeMedPlan(
         allFacilities: finalMerged,
         requiredCapability: 'hyperbaric',
         poolMode: 'capability',
+        params: rankingParams,
       })
     : null
 
@@ -257,7 +265,7 @@ export async function computeMedPlan(
   const pEntry = facilityPace.entries.find(e => e.letter === 'P')
   const pacePrimaryScore = pEntry
     ? rankResult.ranked.find(s => s.facility.id === pEntry.facility.id)
-      ?? { facility: pEntry.facility, transit: pEntry.transit, score: 0, withinGoldenHour: pEntry.transit.effectiveDurationS <= 3600 }
+      ?? { facility: pEntry.facility, transit: pEntry.transit, score: 0, withinGoldenHour: pEntry.transit.effectiveDurationS <= goldenHourS }
     : undefined
 
   let echelonNodes: EchelonNodes | null = selectEchelonNodes(

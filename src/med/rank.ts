@@ -24,6 +24,8 @@
 import type { FacilityRecord } from './facilities/merge'
 import type { CareTier, CapabilityFlag } from './careLevel'
 import { careLevelLabel, isNonTraumaCenter } from './careLevel'
+import type { RankingParams } from './rankingParams'
+import { DEFAULT_RANKING_PARAMS } from './rankingParams'
 
 export interface TransitInfo {
   groundDurationS:    number | null   // null = not computed / unavailable
@@ -57,72 +59,63 @@ export interface RankResult {
 }
 
 // ── Scoring constants ──────────────────────────────────────────────────────────
-
-const TIER_WEIGHT = 100            // score contribution per tier point
-const CAP_WEIGHT  = 8              // score per capability flag
-const GOLDEN_HOUR_S = 3600         // 60 minutes (soft priority boundary)
-const TRANSIT_BONUS = 30           // bonus score if within golden hour
+//
+// All tunable values now live in rankingParams.ts (DEFAULT_RANKING_PARAMS).
+// Every function below takes a `params: RankingParams` argument (defaulting
+// to DEFAULT_RANKING_PARAMS at the public rankFacilities() boundary).
 
 /**
  * Golden-hour transit cost: returns a negative score penalty for transit time.
  *
  * Behaviour:
- *  - t ≤ 60 min: small linear penalty (1 point per 6 min → up to -10 at 60 min).
- *  - t > 60 min: steep additional penalty that grows with overage, discouraging
+ *  - t ≤ goldenHour: small linear penalty (0 at 0 min, up to -inWindowPenaltyMax
+ *    at the golden-hour boundary).
+ *  - t > goldenHour: steep additional penalty that grows with overage, discouraging
  *    long transits without eliminating far facilities.
  *
- * The TRANSIT_BONUS (+30) rewards facilities within the golden hour so they
+ * The goldenHourBonus rewards facilities within the golden hour so they
  * outcompete same-tier far facilities by a meaningful margin.
  */
-function transitScorePenalty(durationS: number): number {
-  if (durationS <= GOLDEN_HOUR_S) {
-    // Smooth linear cost: 0 at 0 min, -10 at 60 min
-    return -(durationS / GOLDEN_HOUR_S) * 10
+function transitScorePenalty(durationS: number, params: RankingParams): number {
+  const goldenHourS = params.goldenHourMin * 60
+  if (durationS <= goldenHourS) {
+    // Smooth linear cost: 0 at 0 min, -inWindowPenaltyMax at the boundary
+    return -(durationS / goldenHourS) * params.inWindowPenaltyMax
   }
-  // Beyond 60 min: base -10 + steep overage penalty
-  const overageMin = (durationS - GOLDEN_HOUR_S) / 60
-  return -10 - overageMin * 2.5   // -10 at 60 min, -85 at ~90 min, -160 at 120 min
+  // Beyond the golden hour: base penalty + steep overage penalty
+  const overageMin = (durationS - goldenHourS) / 60
+  return -params.inWindowPenaltyMax - overageMin * params.lateMinutePenalty
 }
 
 /**
  * Trauma-relevance weight for a capability flag.
  * Neurosurgery and burns are highest priority for penetrating trauma.
  */
-function capWeight(cap: CapabilityFlag): number {
+function capWeight(cap: CapabilityFlag, params: RankingParams): number {
   switch (cap) {
-    case 'neuro':          return 1.5
-    case 'burns':          return 1.4
-    case 'vascular':       return 1.3
-    case 'cardiothoracic': return 1.2
-    case 'surgical':       return 1.1
-    default:               return 1.0
+    case 'neuro':          return params.capWeights.neuro
+    case 'burns':          return params.capWeights.burns
+    case 'vascular':       return params.capWeights.vascular
+    case 'cardiothoracic': return params.capWeights.cardiothoracic
+    case 'surgical':       return params.capWeights.surgical
+    default:               return params.capWeights.other
   }
 }
 
-function scoreFacility(record: FacilityRecord, transit: TransitInfo): number {
+function scoreFacility(record: FacilityRecord, transit: TransitInfo, params: RankingParams): number {
   const t = transit.effectiveDurationS
-  const withinGH = t <= GOLDEN_HOUR_S
+  const goldenHourS = params.goldenHourMin * 60
+  const withinGH = t <= goldenHourS
 
-  const tierScore    = (record.tier as number) * TIER_WEIGHT
-  const transitScore = transitScorePenalty(t)
-  const bonusScore   = withinGH ? TRANSIT_BONUS : 0
-  const capScore     = record.capabilities.reduce((acc, c) => acc + capWeight(c) * CAP_WEIGHT, 0)
+  const tierScore    = (record.tier as number) * params.levelWeight
+  const transitScore = transitScorePenalty(t, params)
+  const bonusScore   = withinGH ? params.goldenHourBonus : 0
+  const capScore     = record.capabilities.reduce((acc, c) => acc + capWeight(c, params) * params.capabilityPoints, 0)
 
   return tierScore + transitScore + bonusScore + capScore
 }
 
 // ── Stabilize-then-transfer detection ────────────────────────────────────────
-
-/**
- * Threshold: the definitive-care transit must be ≥ this multiple of the
- * nearest lower-tier facility's transit to trigger a phased recommendation.
- */
-const STABILIZE_TRANSFER_RATIO = 2.0
-/**
- * Phased plans are only emitted when the closest definitive-care facility is
- * beyond the golden hour. If definitive care is within 60 min, go directly.
- */
-const PHASE_MIN_TRANSIT_S = GOLDEN_HOUR_S
 
 /**
  * Determines whether a stabilize-then-transfer approach should be recommended.
@@ -138,6 +131,7 @@ const PHASE_MIN_TRANSIT_S = GOLDEN_HOUR_S
  */
 function shouldPhasePlan(
   allScored: FacilityScore[],
+  params: RankingParams,
   requiredCapability?: CapabilityFlag,
 ): PhasedRecommendation | undefined {
   if (allScored.length < 2) return undefined
@@ -164,7 +158,8 @@ function shouldPhasePlan(
   )
 
   // If definitive care is within golden hour, go directly — no staging needed
-  if (closestDefinitive.transit.effectiveDurationS <= PHASE_MIN_TRANSIT_S) return undefined
+  const goldenHourS = params.goldenHourMin * 60
+  if (closestDefinitive.transit.effectiveDurationS <= goldenHourS) return undefined
 
   // Among lower-tier capable facilities, find the nearest (stabilization candidate).
   // Excludes NTC (no 24/7 ED) — a stabilize leg must land at a trauma-capable facility.
@@ -180,7 +175,7 @@ function shouldPhasePlan(
 
   // Only recommend phased approach if definitive care is significantly further
   const ratio = closestDefinitive.transit.effectiveDurationS / nearestLower.transit.effectiveDurationS
-  if (ratio < STABILIZE_TRANSFER_RATIO) return undefined
+  if (ratio < params.stabilizeTransferRatio) return undefined
 
   return {
     stabilizeAt: nearestLower.facility,
@@ -206,9 +201,16 @@ export interface RankInput {
  *   facilities with this capability are considered for the phased recommendation.
  *   All facilities still appear in the ranked list so the Facilities tab can
  *   show them; the constraint is enforced only in the plan builders.
+ * @param params - tunable scoring/doctrine parameters (see rankingParams.ts).
+ *   Defaults to DEFAULT_RANKING_PARAMS, reproducing the historical behaviour.
  * @returns ranked list + optional phasedRecommendation
  */
-export function rankFacilities(inputs: RankInput[], requiredCapability?: CapabilityFlag): RankResult {
+export function rankFacilities(
+  inputs: RankInput[],
+  requiredCapability?: CapabilityFlag,
+  params: RankingParams = DEFAULT_RANKING_PARAMS,
+): RankResult {
+  const goldenHourS = params.goldenHourMin * 60
   const scored: FacilityScore[] = inputs.map(inp => {
     const ground = inp.groundDurationS
     const helo   = inp.heloDurationS
@@ -227,8 +229,8 @@ export function rankFacilities(inputs: RankInput[], requiredCapability?: Capabil
     return {
       facility: inp.facility,
       transit,
-      score: scoreFacility(inp.facility, transit),
-      withinGoldenHour: effective <= GOLDEN_HOUR_S,
+      score: scoreFacility(inp.facility, transit, params),
+      withinGoldenHour: effective <= goldenHourS,
     }
   })
 
@@ -237,7 +239,7 @@ export function rankFacilities(inputs: RankInput[], requiredCapability?: Capabil
 
   let phasedRecommendation: PhasedRecommendation | undefined
   if (ranked.length >= 2) {
-    phasedRecommendation = shouldPhasePlan(ranked, requiredCapability)
+    phasedRecommendation = shouldPhasePlan(ranked, params, requiredCapability)
   }
 
   return { ranked, phasedRecommendation }
@@ -254,10 +256,10 @@ export function formatTransit(s: number | null): string {
 }
 
 /** Return a CSS colour variable name based on transit urgency. */
-export function transitColorClass(s: number | null): string {
+export function transitColorClass(s: number | null, goldenHourS: number = DEFAULT_RANKING_PARAMS.goldenHourMin * 60): string {
   if (s === null || s === Infinity) return 'dim'
-  if (s <= GOLDEN_HOUR_S) return 'fast'
-  if (s <= GOLDEN_HOUR_S * 2) return 'slow'
+  if (s <= goldenHourS) return 'fast'
+  if (s <= goldenHourS * 2) return 'slow'
   return 'dim'
 }
 
@@ -265,8 +267,8 @@ export function transitColorClass(s: number | null): string {
  * Hex-colour equivalent of transitColorClass(), for surfaces that render
  * directly to a colour (DOM inline styles, PPTX cell fills) rather than CSS classes.
  */
-export function transitColorHex(s: number | null): string {
-  return s !== null && s <= GOLDEN_HOUR_S ? '#4caf50' : '#ffcc02'
+export function transitColorHex(s: number | null, goldenHourS: number = DEFAULT_RANKING_PARAMS.goldenHourMin * 60): string {
+  return s !== null && s <= goldenHourS ? '#4caf50' : '#ffcc02'
 }
 
 /**

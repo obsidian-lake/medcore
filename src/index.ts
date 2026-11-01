@@ -38,6 +38,8 @@ export { getRouteMatrix, getGroundRoute, getIsochrone60min, heloTransitS, DEFAUL
 // ── Ranking ───────────────────────────────────────────────────────────────────
 export type { FacilityScore, RankResult, TransitInfo, RankInput, PhasedRecommendation } from './med/rank'
 export { rankFacilities, formatTransit, transitColorClass, transitColorHex, tierDisplayLabel } from './med/rank'
+export type { RankingParams, CapWeights } from './med/rankingParams'
+export { DEFAULT_RANKING_PARAMS, normalizeRankingParams, isDefaultRankingParams } from './med/rankingParams'
 
 // ── PACE plans ────────────────────────────────────────────────────────────────
 export type { PaceLetter, FacilityPace, FacilityPaceEntry, TreatmentPace, TreatmentPaceEntry } from './med/pace'
@@ -54,6 +56,9 @@ export { MedMissionParamsCard } from './widgets/MedMissionParamsCard'
 export { MedPacePreview } from './widgets/MedPacePreview'
 export { MedFacilityList } from './widgets/MedFacilityList'
 export { MedMap } from './widgets/MedMap'
+export { MedModal } from './widgets/MedModal'
+export { RankingInfoModal } from './widgets/RankingInfoModal'
+export { RankingSettingsModal } from './widgets/RankingSettingsModal'
 export { directionsUrl } from './util/mapsLink'
 
 // ── Emergency numbers ─────────────────────────────────────────────────────────

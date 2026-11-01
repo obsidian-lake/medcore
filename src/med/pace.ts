@@ -41,8 +41,10 @@
 import type { FacilityScore, TransitInfo } from './rank'
 import type { FacilityRecord } from './facilities/merge'
 import type { CapabilityFlag } from './careLevel'
-import { isNonTraumaCenter } from './careLevel'
+import { isNonTraumaCenter, careLevelLabel } from './careLevel'
 import { formatTransit } from './rank'
+import type { RankingParams } from './rankingParams'
+import { DEFAULT_RANKING_PARAMS } from './rankingParams'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -102,45 +104,46 @@ export interface TreatmentPace {
 }
 
 // ── Facility PACE builder ──────────────────────────────────────────────────────
+//
+// Golden-hour window and capability weights now come from rankingParams.ts
+// (DEFAULT_RANKING_PARAMS) — the single source of truth shared with rank.ts.
 
-/** Golden-hour boundary (60 min in seconds). */
-const GOLDEN_HOUR_S = 3600
-
-/**
- * Trauma-relevance weight for a capability flag.
- * Mirrors the weights in rank.ts — surgical-capable facilities sort above
- * same-tier facilities without specialised trauma capability.
- */
-const CAP_TRAUMA_WEIGHT: Partial<Record<CapabilityFlag, number>> = {
-  neuro:          1.5,
-  burns:          1.4,
-  vascular:       1.3,
-  cardiothoracic: 1.2,
-  surgical:       1.1,
-}
-
-function traumaCapScore(caps: CapabilityFlag[]): number {
-  return caps.reduce((acc, c) => acc + (CAP_TRAUMA_WEIGHT[c] ?? 1.0), 0)
+function traumaCapScore(caps: CapabilityFlag[], params: RankingParams): number {
+  const w = params.capWeights
+  const weightFor = (c: CapabilityFlag): number => {
+    switch (c) {
+      case 'neuro':          return w.neuro
+      case 'burns':          return w.burns
+      case 'vascular':       return w.vascular
+      case 'cardiothoracic': return w.cardiothoracic
+      case 'surgical':       return w.surgical
+      default:               return w.other
+    }
+  }
+  return caps.reduce((acc, c) => acc + weightFor(c), 0)
 }
 
 /**
  * Doctrine sort comparator for the trauma pool.
  *
  * Priority order:
- *  1. Golden-hour Level I (tier 4, transit ≤ 60 min) — always Primary (P slot).
+ *  1. Golden-hour Level I (tier 4, transit within the golden hour) — always Primary (P slot).
  *  2. Remaining: tier descending (highest trauma level first).
  *  3. Tie-break: trauma capability score descending (surgical, neuro, etc.).
  *  4. Tie-break: effective transit ascending (closest first).
  */
-function doctrineCompare(a: FacilityScore, b: FacilityScore): number {
-  const aGLI = (a.facility.tier as number) === 4 && a.transit.effectiveDurationS <= GOLDEN_HOUR_S
-  const bGLI = (b.facility.tier as number) === 4 && b.transit.effectiveDurationS <= GOLDEN_HOUR_S
-  if (aGLI !== bGLI) return aGLI ? -1 : 1
-  const tierDiff = (b.facility.tier as number) - (a.facility.tier as number)
-  if (tierDiff !== 0) return tierDiff
-  const capDiff = traumaCapScore(b.facility.capabilities) - traumaCapScore(a.facility.capabilities)
-  if (capDiff !== 0) return capDiff
-  return a.transit.effectiveDurationS - b.transit.effectiveDurationS
+function makeDoctrineCompare(params: RankingParams): (a: FacilityScore, b: FacilityScore) => number {
+  const goldenHourS = params.goldenHourMin * 60
+  return (a: FacilityScore, b: FacilityScore): number => {
+    const aGLI = (a.facility.tier as number) === 4 && a.transit.effectiveDurationS <= goldenHourS
+    const bGLI = (b.facility.tier as number) === 4 && b.transit.effectiveDurationS <= goldenHourS
+    if (aGLI !== bGLI) return aGLI ? -1 : 1
+    const tierDiff = (b.facility.tier as number) - (a.facility.tier as number)
+    if (tierDiff !== 0) return tierDiff
+    const capDiff = traumaCapScore(b.facility.capabilities, params) - traumaCapScore(a.facility.capabilities, params)
+    if (capDiff !== 0) return capDiff
+    return a.transit.effectiveDurationS - b.transit.effectiveDurationS
+  }
 }
 
 export interface BuildFacilityPaceOpts {
@@ -169,13 +172,18 @@ export interface BuildFacilityPaceOpts {
    *    Used for the dive-mode Chamber PACE plan.
    */
   poolMode?: 'trauma' | 'capability'
+  /** Tunable scoring/doctrine parameters (see rankingParams.ts). Defaults to DEFAULT_RANKING_PARAMS. */
+  params?: RankingParams
 }
 
 export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
   const {
     ranked, overrides = {}, allFacilities,
     requiredCapability, poolMode = 'trauma',
+    params = DEFAULT_RANKING_PARAMS,
   } = opts
+  const goldenHourS = params.goldenHourMin * 60
+  const minPAlevel = params.minPrimaryAlternateLevel as number
   const letters: PaceLetter[] = ['P', 'A', 'C', 'E']
   const entries: FacilityPaceEntry[] = []
   const warnings: string[] = []
@@ -193,7 +201,7 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
   //   chamber appears regardless of rank position.
   //
   // Medic overrides can still force-assign any facility (see override path below).
-  const sorted = poolMode === 'trauma' ? [...ranked].sort(doctrineCompare) : ranked
+  const sorted = poolMode === 'trauma' ? [...ranked].sort(makeDoctrineCompare(params)) : ranked
 
   const preNtcFilter = (s: FacilityScore) =>
     !s.facility.pediatricOnly &&
@@ -201,7 +209,7 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
     (!requiredCapability || s.facility.capabilities.includes(requiredCapability)) &&
     (poolMode !== 'trauma' || !s.facility.isChamber) &&
     // Trauma mode: exclude Level I beyond golden hour (Echelons of Care plan handles them).
-    (poolMode !== 'trauma' || (s.facility.tier as number) < 4 || s.transit.effectiveDurationS <= GOLDEN_HOUR_S)
+    (poolMode !== 'trauma' || (s.facility.tier as number) < 4 || s.transit.effectiveDurationS <= goldenHourS)
 
   const pool = sorted.filter(s =>
     preNtcFilter(s) &&
@@ -227,11 +235,12 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
     )
   }
 
-  // Eligible sub-pool for P and A: Level III+ (tier ≥ 2) adult trauma facilities.
-  // Only enforced in trauma mode — chambers are not trauma-tiered, so in capability
-  // mode all pool members are eligible for P/A slots.
+  // Eligible sub-pool for P and A: configured minimum care level (default Level
+  // III+, tier ≥ 2) adult trauma facilities. Only enforced in trauma mode —
+  // chambers are not trauma-tiered, so in capability mode all pool members are
+  // eligible for P/A slots.
   const eligiblePool = poolMode === 'trauma'
-    ? pool.filter(s => (s.facility.tier as number) >= 2)
+    ? pool.filter(s => (s.facility.tier as number) >= minPAlevel)
     : pool
 
   for (const letter of letters) {
@@ -264,18 +273,20 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
       // Fallback to full pool (any tier, any type)
       next = pool.find(s => !usedIds.has(s.facility.id))
 
-      // Warn when a P/A slot had to fall back to Level IV basic care.
+      // Warn when a P/A slot had to fall back below the configured minimum level.
       // Only emit in trauma mode — this warning is specific to trauma triage logic
       // and is wrong/misleading when filling the chamber PACE plan.
-      if (poolMode === 'trauma' && isPrimaryOrAlt && next && (next.facility.tier as number) < 2) {
+      if (poolMode === 'trauma' && isPrimaryOrAlt && next && (next.facility.tier as number) < minPAlevel) {
         const fac = next.facility
-        const msg = `${letter}: No Level III+ adult trauma center available — Level IV basic care used as fallback (${fac.name})`
+        const minLabel = careLevelLabel(params.minPrimaryAlternateLevel)
+        const facLabel = careLevelLabel(fac.tier)
+        const msg = `${letter}: No facility at ${minLabel} or better available — ${facLabel} used as fallback (${fac.name})`
         warnings.push(msg)
         entries.push({
           letter,
           facility: fac,
           transit: next.transit,
-          phasedNote: `⚠ Level IV basic care only — verify suitability for adult trauma`,
+          phasedNote: `⚠ ${facLabel} only — verify suitability for adult trauma`,
           overridden: false,
         })
         continue

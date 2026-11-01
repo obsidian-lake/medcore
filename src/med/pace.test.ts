@@ -16,6 +16,7 @@ import { buildFacilityPace } from './pace'
 import type { FacilityScore, TransitInfo } from './rank'
 import type { FacilityRecord } from './facilities/merge'
 import type { CapabilityFlag } from './careLevel'
+import { normalizeRankingParams } from './rankingParams'
 
 function mkFacility(overrides: Partial<FacilityRecord>): FacilityRecord {
   return {
@@ -257,7 +258,7 @@ describe('buildFacilityPace — eligibility floor', () => {
     expect(aEntry).toBeDefined()
 
     expect(warnings.length).toBeGreaterThan(0)
-    expect(warnings[0]).toMatch(/Level III\+/)
+    expect(warnings[0]).toMatch(/No facility at Level III/)
 
     // Fallback entries should have a phasedNote warning annotation
     expect(pEntry?.phasedNote).toBeTruthy()
@@ -459,6 +460,51 @@ describe('buildFacilityPace — NTC exclusion', () => {
 
     const allIds = entries.map(e => e.facility.id)
     expect(allIds).toContain('hbo')
+  })
+
+})
+
+describe('buildFacilityPace with custom params', () => {
+
+  test('lowering minPrimaryAlternateLevel to Level II-or-better makes a tier-1 facility ineligible without warning when a tier-2 exists, but raising to Level I-only forces fallback', () => {
+    const lvlIIIa = mkFacility({ id: 'l3a', name: 'Community Hospital A', tier: 2 })
+    const lvlIIIb = mkFacility({ id: 'l3b', name: 'Community Hospital B', tier: 2 })
+    const lvlIV   = mkFacility({ id: 'l4', name: 'Rural Clinic', tier: 1 })
+    const ranked: FacilityScore[] = [
+      mkScore(lvlIV, 300, 250), mkScore(lvlIIIa, 600, 200), mkScore(lvlIIIb, 900, 190),
+    ]
+
+    // Default floor (Level III = tier 2): two tier-2 candidates fill P and A with
+    // no fallback, so lvlIV never needs to be touched for those slots.
+    const defaultResult = buildFacilityPace({ ranked, allFacilities: [lvlIV, lvlIIIa, lvlIIIb] })
+    expect(defaultResult.entries.find(e => e.letter === 'P')!.facility.id).toBe('l3a')
+    expect(defaultResult.entries.find(e => e.letter === 'A')!.facility.id).toBe('l3b')
+    expect(defaultResult.warnings).toHaveLength(0)
+
+    // Raise the floor to Level I only (tier 4): none of the three candidates
+    // qualifies, so P falls back below the floor and a warning is emitted.
+    const strictParams = normalizeRankingParams({ minPrimaryAlternateLevel: 4 })
+    const strictResult = buildFacilityPace({ ranked, allFacilities: [lvlIV, lvlIIIa, lvlIIIb], params: strictParams })
+    const pEntry = strictResult.entries.find(e => e.letter === 'P')!
+    expect(pEntry.facility.id).toBe('l3a')   // still the closest/highest doctrine pick, just flagged
+    expect(strictResult.warnings.some(w => w.includes('Level I'))).toBe(true)
+  })
+
+  test('shrinking the golden hour excludes a previously-in-window Level I from the trauma pool', () => {
+    const lvlI = mkFacility({ id: 'l1', name: 'Level I Trauma', tier: 4 })
+    const lvlIII = mkFacility({ id: 'l3', name: 'Community Hospital', tier: 2 })
+    // 50 min — within the default 60 min golden hour, beyond a tightened 30 min one.
+    const ranked: FacilityScore[] = [mkScore(lvlI, 50 * 60, 300), mkScore(lvlIII, 600, 200)]
+
+    const defaultResult = buildFacilityPace({ ranked, allFacilities: [lvlI, lvlIII] })
+    expect(defaultResult.entries.find(e => e.letter === 'P')!.facility.id).toBe('l1')
+
+    const tightParams = normalizeRankingParams({ goldenHourMin: 30 })
+    const tightResult = buildFacilityPace({ ranked, allFacilities: [lvlI, lvlIII], params: tightParams })
+    // Level I is now beyond the (tightened) golden hour — excluded from the trauma
+    // pool entirely (belongs to the Echelons of Care plan instead).
+    expect(tightResult.entries.some(e => e.facility.id === 'l1')).toBe(false)
+    expect(tightResult.entries.find(e => e.letter === 'P')!.facility.id).toBe('l3')
   })
 
 })

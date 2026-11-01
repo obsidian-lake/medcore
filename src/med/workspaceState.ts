@@ -20,6 +20,7 @@ import type { CustomFacility } from '../types/customFacility'
 import type { RankResult } from './rank'
 import type { FacilityPace, TreatmentPace, PaceLetter } from './pace'
 import type { EchelonPlan } from './echelon'
+import type { RankingParams } from './rankingParams'
 
 export interface MedWorkspaceState {
   targetLat: number
@@ -36,6 +37,7 @@ export interface MedWorkspaceState {
   countryCode: string
   searchRadiusM: number
   showIsochrone: boolean
+  rankingParams: RankingParams
 
   opName: string
   unitName: string
