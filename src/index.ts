@@ -45,7 +45,7 @@ export { buildFacilityPace, buildTreatmentPace, paceLetterColor } from './med/pa
 
 // ── Echelons of care ─────────────────────────────────────────────────────────
 export type { EchelonNodes, EchelonPlan } from './med/echelon'
-export { selectEchelonNodes, buildEchelonPlan, pickNearestLevelI, LEG2_DROP_GROUND_DIST_M, LEG2_FIXED_WING_DIST_M } from './med/echelon'
+export { selectEchelonNodes, buildEchelonPlan, pickNearestLevelI, formatEchelonSummary, LEG2_DROP_GROUND_DIST_M, LEG2_FIXED_WING_DIST_M } from './med/echelon'
 
 // ── Med workspace widgets (shared MapScreen/TargetScreen/PaceScreen/
 // FacilitiesScreen UI, mission-planner expansion plan, Phase 6a) ────────────
