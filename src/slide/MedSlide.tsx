@@ -53,8 +53,8 @@ export interface MedSlideInput {
   /** ISO 3166-1 alpha-2 country code (drives TRICARE language note). */
   countryCode: string
   diveMode: boolean
-  /** Golden-hour window in minutes (from rankingParams), used for transit colour coding. */
-  goldenHourMin: number
+  /** Golden-hour window in minutes (from rankingParams), used for transit colour coding. Defaults to 60. */
+  goldenHourMin?: number
 }
 
 interface Props {
@@ -161,7 +161,7 @@ function FacilityPaceRows({ entries, state }: { entries: FacilityPaceEntry[]; st
                 </div>
               )}
             </td>
-            <td style={{ padding: '4px 4px', fontSize: 11, color: transitColorHex(entry.transit.groundDurationS, state.goldenHourMin * 60) }}>
+            <td style={{ padding: '4px 4px', fontSize: 11, color: transitColorHex(entry.transit.groundDurationS, (state.goldenHourMin ?? 60) * 60) }}>
               {formatTransit(entry.transit.groundDurationS)}
             </td>
             <td style={{ padding: '4px 4px', fontSize: 11, color: '#81c784' }}>
