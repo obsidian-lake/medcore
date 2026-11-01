@@ -28,7 +28,7 @@ import { careLevelRoman, type CareTier } from '../med/careLevel'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const SNAP_W = 900
+export const SNAP_W = 900
 const SNAP_H = 910   // ~0.988:1 — matches PDF map slot (640×648) to eliminate cover-crop side bleed
 const EXPORT_SCALE = 3
 
@@ -331,6 +331,41 @@ async function renderEchelonInsetCanvas(
   }
 }
 
+/**
+ * The returned mapCanvas is embedded at several different aspect ratios
+ * downstream (PDF slot, PPTX slot, standalone JPG) via cropCanvasCover
+ * (each consuming app's own medPackage.ts), each cropping a different
+ * amount off the canvas's edges. Pass each crop's *logical* (un-scaled)
+ * target pixel size here so the echelon inset is only ever placed
+ * somewhere that survives every one of them — otherwise a corner that
+ * looks fine on the full canvas can still have its border (or worse,
+ * part of its content) sliced off by whichever crop removes the most
+ * from that edge. All dimensions are in EXPORT_SCALE canvas pixels,
+ * matching mainCanvas's own coordinate space.
+ */
+interface CropTarget { w: number; h: number }
+
+/**
+ * Intersect the source-space regions that survive every downstream crop
+ * (cropCanvasCover's cover/center-crop math, inverted) into one rectangle.
+ * No crops → the full canvas (today's behavior, unconstrained).
+ */
+function computeCropSafeRect(canvasW: number, canvasH: number, crops: CropTarget[]) {
+  let x0 = 0, y0 = 0, x1 = canvasW, y1 = canvasH
+  for (const { w: tw, h: th } of crops) {
+    const scale = Math.max(tw / canvasW, th / canvasH)
+    const scaledW = canvasW * scale, scaledH = canvasH * scale
+    const ox = (scaledW - tw) / 2, oy = (scaledH - th) / 2
+    // cropCanvasCover keeps scaled-space window [ox, ox+tw] x [oy, oy+th];
+    // map that back to source-space by dividing out the crop's own scale.
+    x0 = Math.max(x0, ox / scale)
+    y0 = Math.max(y0, oy / scale)
+    x1 = Math.min(x1, (ox + tw) / scale)
+    y1 = Math.min(y1, (oy + th) / scale)
+  }
+  return { x0, y0, x1, y1 }
+}
+
 // ── Inset compositor ───────────────────────────────────────────────────────────
 
 /**
@@ -340,28 +375,37 @@ async function renderEchelonInsetCanvas(
  *   • A large penalty for the bottom-right north-arrow reserved region so the
  *     inset never covers the compass unless every other corner is also busy.
  * targetPx is used as a tie-breaker (prefer the corner farthest from target).
+ * Corners are confined to cropSafeRect (see computeCropSafeRect) so the inset
+ * — border included — can never be clipped by a downstream crop.
  */
 function blitEchelonInset(
   mainCanvas:   HTMLCanvasElement,
   insetCanvas:  HTMLCanvasElement,
   obstaclesPx:  { x: number; y: number }[],
+  cropSafeRect: { x0: number; y0: number; x1: number; y1: number },
   targetPx?:    { x: number; y: number },
 ): void {
   const ctx    = mainCanvas.getContext('2d')!
   const s      = EXPORT_SCALE
   const margin = INSET_MARGIN * s
+  // Dark backing/border protrude 4*s beyond the inset image itself (drawn
+  // below) — fold that into the placement margin so cropSafeRect guarantees
+  // the *border*, not just the inset photo, survives every downstream crop.
+  const effectiveMargin = margin + 4 * s
   const iw     = insetCanvas.width
   const ih     = insetCanvas.height
   const W      = mainCanvas.width
   const H      = mainCanvas.height
 
-  // Four candidate corners — UR is the legacy default, so it leads the list and
-  // wins all tie-breaks when no obstacles are present.
+  // Four candidate corners, confined to cropSafeRect (not the full canvas —
+  // see its doc comment) — UR is the legacy default, so it leads the list
+  // and wins all tie-breaks when no obstacles are present.
+  const { x0, y0, x1, y1 } = cropSafeRect
   const corners = [
-    { bx: W - iw - margin, by: margin          },  // UR
-    { bx: margin,          by: margin          },  // UL
-    { bx: margin,          by: H - ih - margin },  // LL
-    { bx: W - iw - margin, by: H - ih - margin },  // LR
+    { bx: x1 - iw - effectiveMargin, by: y0 + effectiveMargin      },  // UR
+    { bx: x0 + effectiveMargin,      by: y0 + effectiveMargin      },  // UL
+    { bx: x0 + effectiveMargin,      by: y1 - ih - effectiveMargin },  // LL
+    { bx: x1 - iw - effectiveMargin, by: y1 - ih - effectiveMargin },  // LR
   ]
 
   // North-arrow reserved region (bottom-right corner).
@@ -454,6 +498,10 @@ export async function renderMedMapToCanvas(
   onProgress?:         (msg: string) => void,
   echelonPlan?:        EchelonPlan,
   chamberPace?:        FacilityPace | null,
+  /** Logical (un-scaled) pixel size of every downstream crop this canvas will
+   *  be embedded at (PDF slot, PPTX slot, …) — see computeCropSafeRect's doc
+   *  comment. Omit only for callers that never crop the result. */
+  downstreamCrops?:    CropTarget[],
 ): Promise<HTMLCanvasElement | undefined> {
   const log = (msg: string) => onProgress?.(msg)
   const safeRoutes: Record<string, RouteResult> = groundRoutes ?? {}
@@ -645,7 +693,11 @@ export async function renderMedMapToCanvas(
     if (echelonPlan) {
       log('Imagery: rendering echelon inset…')
       const insetCanvas = await renderEchelonInsetCanvas(L, target, echelonPlan, facilityPace, safeRoutes)
-      if (insetCanvas) blitEchelonInset(canvas, insetCanvas, obstaclesPx, targetPx)
+      if (insetCanvas) {
+        const scaledCrops = (downstreamCrops ?? []).map(c => ({ w: c.w * EXPORT_SCALE, h: c.h * EXPORT_SCALE }))
+        const cropSafeRect = computeCropSafeRect(canvas.width, canvas.height, scaledCrops)
+        blitEchelonInset(canvas, insetCanvas, obstaclesPx, cropSafeRect, targetPx)
+      }
     }
 
     return canvas
