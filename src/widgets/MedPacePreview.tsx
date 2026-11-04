@@ -155,9 +155,50 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
             </div>
           )}
 
-          {facilityPace?.entries.map(entry => {
+          {facilityPace && (['P', 'A', 'C', 'E'] as PaceLetter[]).map(letter => {
+            const entry = facilityPace.entries.find(e => e.letter === letter)
+            const facilityOptions = (
+              <>
+                {rankedFacilities.map(fs => (
+                  <option key={fs.facility.id} value={fs.facility.id}>
+                    {fs.facility.name} (Lvl {careLevelRoman(fs.facility.tier)}, {formatTransit(fs.transit.effectiveDurationS)})
+                  </option>
+                ))}
+                {allFacilities.filter(f => !rankedFacilities.find(r => r.facility.id === f.id)).map(f => (
+                  <option key={f.id} value={f.id}>{f.name} (unranked)</option>
+                ))}
+              </>
+            )
+
+            // Slot has nothing auto-assigned (e.g. no trauma-capable facility left
+            // for this letter) and no override set yet — still render the row so
+            // the medic can manually add one (including an NTC facility).
+            if (!entry) {
+              return (
+                <div key={letter} className="pace-entry pace-entry-empty" style={{ marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 700, color: paceColor(letter), minWidth: 20 }}>
+                      {letter}
+                    </span>
+                    <span className="mono" style={{ color: 'var(--text-dim)', fontSize: 13, fontStyle: 'italic' }}>
+                      No facility assigned
+                    </span>
+                  </div>
+                  <div style={{ marginLeft: 28 }}>
+                    <select
+                      value=""
+                      onChange={e => { if (e.target.value) setFacilityPaceOverride(letter, e.target.value) }}
+                      style={{ fontSize: 11, padding: '3px 6px', width: 'auto', maxWidth: 340 }}
+                    >
+                      <option value="">— Add a facility —</option>
+                      {facilityOptions}
+                    </select>
+                  </div>
+                </div>
+              )
+            }
+
             const fac = entry.facility
-            const letter = entry.letter
             const isDragging = facDragLetter === letter
             const isDragOver = facDragOverLetter === letter && facDragLetter !== letter
             return (
@@ -235,14 +276,7 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
                     onChange={e => setFacilityPaceOverride(letter, e.target.value)}
                     style={{ fontSize: 11, padding: '3px 6px', width: 'auto', maxWidth: 340 }}
                   >
-                    {rankedFacilities.map(fs => (
-                      <option key={fs.facility.id} value={fs.facility.id}>
-                        {fs.facility.name} (Lvl {careLevelRoman(fs.facility.tier)}, {formatTransit(fs.transit.effectiveDurationS)})
-                      </option>
-                    ))}
-                    {allFacilities.filter(f => !rankedFacilities.find(r => r.facility.id === f.id)).map(f => (
-                      <option key={f.id} value={f.id}>{f.name} (unranked)</option>
-                    ))}
+                    {facilityOptions}
                   </select>
                   {state.facilityPaceOverrides[letter] && (
                     <button className="btn btn-sm btn-warn" style={{ marginLeft: 6 }} onClick={() => setFacilityPaceOverride(letter, '')}>

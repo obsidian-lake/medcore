@@ -9,6 +9,10 @@
  *        the closest highest-capability facility, prioritising surgical capability.
  *      - Level I facilities beyond the golden hour are EXCLUDED from the Facility PACE
  *        plan entirely — they appear only in the separate Echelons of Care plan.
+ *      - Primary/Alternate must be trauma-capable (24/7 ED); Non-Trauma Center (NTC,
+ *        tier 0) facilities are never eligible there. Contingency/Emergency fall back
+ *        to the nearest NTC facility rather than staying empty when no trauma-capable
+ *        candidate remains — flagged with a phasedNote.
  *    Medic overrides win regardless of eligibility.
  *
  * 2. Treatment PACE — templated per doctrine (TCCC intent):
@@ -213,10 +217,18 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
 
   const pool = sorted.filter(s =>
     preNtcFilter(s) &&
-    // Trauma mode: NTC facilities (no 24/7 ED) are never PACE-eligible, regardless
-    // of distance. Capability mode (chambers) is untiered, so NTC is irrelevant there.
+    // Trauma mode: NTC facilities (no 24/7 ED) are never eligible for Primary/
+    // Alternate, regardless of distance. Capability mode (chambers) is untiered,
+    // so NTC is irrelevant there. Contingency/Emergency may still fall back to
+    // NTC — see `ceFallbackPool` below.
     (poolMode !== 'trauma' || !isNonTraumaCenter(s.facility.tier))
   )
+
+  // Contingency/Emergency fallback pool: same eligibility as `pool` but — trauma
+  // mode only — NTC facilities are allowed back in. C/E exist precisely for
+  // "whatever is reachable" if nothing trauma-capable is; P/A must stay
+  // trauma-capable (enforced via `pool`/`eligiblePool` below).
+  const ceFallbackPool = poolMode === 'trauma' ? sorted.filter(preNtcFilter) : pool
 
   // Warn when a capability constraint excludes everything (dive mode, chamber PACE).
   if (requiredCapability && pool.length === 0) {
@@ -226,12 +238,15 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
     )
   }
 
-  // Warn when the only reason the pool is empty is that every in-range candidate
-  // is a Non-Trauma Center (no 24/7 ED) — distinct from "nothing nearby at all".
+  // Warn when the only reason the trauma pool is empty is that every in-range
+  // candidate is a Non-Trauma Center (no 24/7 ED) — distinct from "nothing nearby
+  // at all". P/A will stay unfilled; C/E auto-fill from `ceFallbackPool` below.
   if (poolMode === 'trauma' && pool.length === 0 && sorted.some(preNtcFilter)) {
     warnings.push(
-      `No trauma-capable facilities in range — only Non-Trauma Center (NTC) hospitals found. ` +
-      `Expand the search radius, or override a PACE slot with an NTC facility manually.`
+      `No trauma-capable facilities in range for Primary/Alternate — only Non-Trauma ` +
+      `Center (NTC) hospitals found. Contingency/Emergency will use the nearest NTC ` +
+      `facility; expand the search radius for a trauma-capable Primary/Alternate, or ` +
+      `override P/A with an NTC facility manually.`
     )
   }
 
@@ -287,6 +302,23 @@ export function buildFacilityPace(opts: BuildFacilityPaceOpts): FacilityPace {
           facility: fac,
           transit: next.transit,
           phasedNote: `⚠ ${facLabel} only — verify suitability for adult trauma`,
+          overridden: false,
+        })
+        continue
+      }
+    }
+
+    // Contingency/Emergency only: when no trauma-capable facility remains for
+    // this slot, fall back to the nearest NTC facility rather than leaving the
+    // slot empty. P/A never fall back this far — they must stay trauma-capable.
+    if (!next && !isPrimaryOrAlt) {
+      const ntcNext = ceFallbackPool.find(s => !usedIds.has(s.facility.id))
+      if (ntcNext) {
+        entries.push({
+          letter,
+          facility: ntcNext.facility,
+          transit: ntcNext.transit,
+          phasedNote: '⚠ Non-Trauma Center (no 24/7 ED) — contingency/emergency use only, not for primary definitive care',
           overridden: false,
         })
         continue

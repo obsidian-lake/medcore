@@ -380,9 +380,9 @@ describe('buildFacilityPace — dive mode (requiredCapability: hyperbaric)', () 
 
 // ── NTC (Non-Trauma Center, tier 0) ───────────────────────────────────────────
 
-describe('buildFacilityPace — NTC exclusion', () => {
+describe('buildFacilityPace — NTC handling', () => {
 
-  test('NTC facility never fills any trauma PACE slot (P/A/C/E), however close', () => {
+  test('NTC facility can fill Contingency/Emergency but never Primary/Alternate, however close', () => {
     const ntc   = mkFacility({ id: 'ntc', name: 'Urgent Care (no 24/7 ED)', tier: 0 })
     const basic = mkFacility({ id: 'b',   name: 'Rural Level IV',          tier: 1 })
 
@@ -396,12 +396,14 @@ describe('buildFacilityPace — NTC exclusion', () => {
       allFacilities: [ntc, basic],
     })
 
-    const allIds = entries.map(e => e.facility.id)
-    expect(allIds).not.toContain('ntc')
-    expect(allIds.every(id => id === 'b')).toBe(true)
+    const byLetter = Object.fromEntries(entries.map(e => [e.letter, e.facility.id]))
+    expect(byLetter.P).toBe('b')       // only trauma-capable candidate — takes Primary
+    expect(byLetter.A).toBeUndefined() // no trauma-capable candidate left; NTC not eligible for A
+    expect(byLetter.C).toBe('ntc')     // Contingency falls back to NTC
+    expect(byLetter.E).toBeUndefined() // nothing left at all
   })
 
-  test('warning emitted when only NTC facilities are in range', () => {
+  test('Contingency/Emergency auto-fill with NTC facilities when nothing trauma-capable is in range; Primary/Alternate stay empty with a warning', () => {
     const ntc1 = mkFacility({ id: 'n1', name: 'Clinic A (no 24/7 ED)', tier: 0 })
     const ntc2 = mkFacility({ id: 'n2', name: 'Clinic B (no 24/7 ED)', tier: 0 })
 
@@ -415,7 +417,11 @@ describe('buildFacilityPace — NTC exclusion', () => {
       allFacilities: [ntc1, ntc2],
     })
 
-    expect(entries).toHaveLength(0)
+    const byLetter = Object.fromEntries(entries.map(e => [e.letter, e.facility.id]))
+    expect(byLetter.P).toBeUndefined()
+    expect(byLetter.A).toBeUndefined()
+    expect(byLetter.C).toBe('n1')
+    expect(byLetter.E).toBe('n2')
     expect(warnings.some(w => /NTC/.test(w))).toBe(true)
   })
 
