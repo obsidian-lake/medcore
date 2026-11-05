@@ -33,6 +33,11 @@ function reorder<T>(arr: T[], fromIdx: number, toIdx: number): T[] {
   return copy
 }
 
+/** Indices actually shifted by a splice-move from `fromIdx` to `toIdx` — everything else keeps its original content. */
+function affectedRange(fromIdx: number, toIdx: number): [number, number] {
+  return [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)]
+}
+
 interface Props {
   state: MedWorkspaceState
   onPatch: MedWorkspacePatch
@@ -53,9 +58,11 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
   const [treatDragLetter, setTreatDragLetter] = useState<PaceLetter | null>(null)
   const [treatDragOverLetter, setTreatDragOverLetter] = useState<PaceLetter | null>(null)
 
-  // Reordering a PACE table pins every slot to an explicit facility id (or
-  // treatment content) for the letters involved — the letters themselves
-  // (P/A/C/E) never move, only what fills them, same as a single-slot override.
+  // Reordering a PACE table pins only the slots a splice-move actually shifts
+  // (between fromIdx and toIdx) to an explicit facility id (or treatment
+  // content) — the letters themselves (P/A/C/E) never move, only what fills
+  // them, same as a single-slot override. Slots outside that range keep their
+  // original content and must not be marked as overridden.
   const handleFacilityPaceDrop = (toLetter: PaceLetter) => {
     const fromLetter = facDragLetter
     setFacDragLetter(null)
@@ -68,7 +75,8 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
     if (fromIdx === -1 || toIdx === -1) return
     const newIds = reorder(idSeq, fromIdx, toIdx)
     const overrides = { ...state.facilityPaceOverrides }
-    letterSeq.forEach((letter, i) => { overrides[letter] = newIds[i] })
+    const [lo, hi] = affectedRange(fromIdx, toIdx)
+    for (let i = lo; i <= hi; i++) overrides[letterSeq[i]] = newIds[i]
     onPatch({ facilityPaceOverrides: overrides })
   }
 
@@ -84,7 +92,8 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
     if (fromIdx === -1 || toIdx === -1) return
     const newIds = reorder(idSeq, fromIdx, toIdx)
     const overrides = { ...state.chamberPaceOverrides }
-    letterSeq.forEach((letter, i) => { overrides[letter] = newIds[i] })
+    const [lo, hi] = affectedRange(fromIdx, toIdx)
+    for (let i = lo; i <= hi; i++) overrides[letterSeq[i]] = newIds[i]
     onPatch({ chamberPaceOverrides: overrides })
   }
 
@@ -100,7 +109,8 @@ export function MedPacePreview({ state, onPatch, rankedFacilities }: Props) {
     if (fromIdx === -1 || toIdx === -1) return
     const newContent = reorder(contentSeq, fromIdx, toIdx)
     const overrides = { ...state.treatmentPaceOverrides }
-    letterSeq.forEach((letter, i) => { overrides[letter] = newContent[i] })
+    const [lo, hi] = affectedRange(fromIdx, toIdx)
+    for (let i = lo; i <= hi; i++) overrides[letterSeq[i]] = newContent[i]
     onPatch({ treatmentPaceOverrides: overrides })
   }
 
